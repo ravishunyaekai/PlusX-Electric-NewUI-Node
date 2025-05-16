@@ -1,0 +1,47 @@
+
+
+Start Date : 04-04-2025
+
+    1. Added code deeplink when paymnet is done or cancel in IOS 
+        File name/ Path : server.js 
+        1. in apple-app-site-association  add "/payment-success", "/payment-success/*", "/payment-cancel", "/payment-cancel/*"  path & link 
+
+    2. Added code db re-connect when connection lost or cloesd
+        File name/ Path : config\db.js 
+        1. add db re-connect code  
+
+    3. In routes added getPaymnetSession function for craeting Stripe session for IOS
+        3.1. deteletd Rider List path & Link (api.js)
+        3.2. Failed POD / valte booking path & Link  (admin.js)
+
+    4. Login function replaced in admin auth Controller
+        File name/ Path : Controller \Admin\ AuthController 
+
+    5. In valtet Booking List PNR status booking should not be come & added Failed Booking List function 
+        File name/ Path : Controller \Admin\ PickAndDropController
+
+    6. In POD Slot list function RO status include in slot booking count query & added Failed Booking List function  
+        File name/ Path : Controller \Admin\ PortableChargerController
+       
+
+    7. In Driver BookingList function RO Status added
+        File name/ Path : Controller \Admin\ RSAController
+      
+
+    8. In Controller \Export Controller removed some extra space & garbez function 
+
+    9.  Craete invoice for POD/ valte function replace (for booking Confirmation ) 
+        File name/ Path : Controller \Invoice Controller  
+
+    10. Cretae intent added address details for POD/ Valet Booking.
+        File name/ Path : Controller \paymentController  
+        
+    11. Cretae Booking status PNR, & added create invoice function when work complete 
+        File name/ Path : Controller\API\pick & drop  
+        
+    12. 
+        12.1. Address Alert in POD booking List (added when charging start)
+        12.2. Added function craete Invoice when chargerpickedup 
+        File name/ Path : Controller\API\portablecharger  
+    
+End Date : 04-04-2025

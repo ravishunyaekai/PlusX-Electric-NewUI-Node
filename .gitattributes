@@ -1,0 +1,11 @@
+# Ensure text files use LF in the repo and CRLF on checkout for Windows users
+* text=auto
+
+# Handle specific files like package.json and lock files
+package.json eol=lf
+package-lock.json eol=lf
+
+# Ignore binary files for line-ending conversion
+*.png binary
+*.jpg binary
+*.exe binary
