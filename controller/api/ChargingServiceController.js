@@ -7,7 +7,7 @@ import emailQueue from "../../emailQueue.js";
 import validateFields from "../../validation.js";
 import { insertRecord, queryDB, getPaginatedData, updateRecord } from '../../dbUtils.js';
 import db from "../../config/db.js";
-import { createNotification, mergeParam, pushNotification, formatDateTimeInQuery, asyncHandler, formatDateInQuery } from "../../utils.js";
+import { createNotification, mergeParam, formatDateTimeInQuery, asyncHandler, formatDateInQuery, checkCoupon } from "../../utils.js";
 dotenv.config();
 
 import { tryCatchErrorHandler } from "../../middleware/errorHandler.js";
@@ -36,7 +36,7 @@ export const getChargingServiceSlotList = asyncHandler(async (req, resp) => {
 
 export const requestService = asyncHandler(async (req, resp) => {
     
-    const { rider_id, name, country_code, contact_no, pickup_address, pickup_latitude, pickup_longitude, parking_number='', parking_floor='', vehicle_id, slot_date_time, slot_id, price = '', order_status = 'PNR', device_name = '' } = mergeParam(req);
+    const { rider_id, name, country_code, contact_no, pickup_address, pickup_latitude, pickup_longitude, parking_number='', parking_floor='', vehicle_id, slot_date_time, slot_id, price = 0, order_status = 'PNR', device_name = '', coupon_code='', address_id } = mergeParam(req);
 
     const { isValid, errors } = validateFields(mergeParam(req), {
         rider_id         : ["required"],
@@ -48,14 +48,49 @@ export const requestService = asyncHandler(async (req, resp) => {
         pickup_latitude  : ["required"],
         pickup_longitude : ["required"],
         vehicle_id       : ["required"],
-        // parking_number   : ["required"],
-        // parking_floor    : ["required"],
-        slot_date_time   : ["required"],
+        // parking_number : ["required"],
+        // parking_floor  : ["required"],
+        slot_date_time    : ["required"],
+        address_id        : ["required"],
     });
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
     
     // const conn = await startTransaction();
-    try{
+    try {
+        const riderAddress = await queryDB(`
+            SELECT 
+                landmark, 
+                (SELECT count(id) from riders_vehicles where rider_id =? and vehicle_id = ? ) as vehicle_count,
+                ( SELECT pick_drop_price FROM booking_price LIMIT 1) as booking_price
+            FROM 
+                rider_address
+            WHERE 
+                rider_id =? and address_id = ? order by id desc
+            LIMIT 1 `,
+        [ rider_id, vehicle_id, rider_id, address_id ]);
+
+        if(!riderAddress) return resp.json({ message : ["Address Id not valid!"], status: 0, code: 422, error: true });
+        if(riderAddress.vehicle_count == 0) return resp.json({ message : ["Vehicle Id not valid!"], status: 0, code: 422, error: true });
+    
+        const vatAmt       = Math.floor(( parseFloat(riderAddress.booking_price) ) * 5) / 100; 
+        const bookingPrice = Math.floor( ( parseFloat(riderAddress.booking_price) + vatAmt ) * 100) ;
+
+        if(parseFloat(price) != bookingPrice && coupon_code == '') { 
+            return resp.json({ message : ['coupon_code is required'], status: 0, code: 422, error: true });
+        }
+        else if(parseFloat(price) != bookingPrice && coupon_code) {
+            const servicePrice = parseFloat(price) ;
+            const couponData   = await checkCoupon(rider_id, 'Valet Charging', coupon_code);
+            
+            if(couponData.status == 0 ){
+                return resp.json({ message : [couponData.message], status: 0, code: 422, error: true });
+
+            } else if(servicePrice != couponData.service_price ){
+                return resp.json({ message : ['Booking price is not valid!'], status: 0, code: 422, error: true, bookingPrice : couponData.service_price });
+            }
+        }  
+        const area = riderAddress.landmark;
+
         const fSlotDateTime = moment(slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('YYYY-MM-DD HH:mm:ss');
         const currDateTime  = moment().utcOffset(4).format('YYYY-MM-DD HH:mm:ss');
         if (fSlotDateTime < currDateTime) return resp.json({status: 0, code: 422, message: ["Invalid slot, Please select another slot"]});
@@ -98,10 +133,10 @@ export const requestService = asyncHandler(async (req, resp) => {
         }
         const insert = await insertRecord('charging_service', [
             'request_id', 'rider_id', 'name', 'country_code', 'contact_no', 'vehicle_id', 'slot', 'slot_date_time', 'pickup_address', 'parking_number', 'parking_floor', 
-            'price', 'order_status', 'pickup_latitude', 'pickup_longitude', 'device_name'
+            'price', 'order_status', 'pickup_latitude', 'pickup_longitude', 'device_name', 'area', 'address_id'
         ], [
-            'CS', rider_id, name, country_code, contact_no, vehicle_id, slot_id, slotDateTime, pickup_address, parking_number, parking_floor, price, order_status, pickup_latitude, pickup_longitude, device_name
-        ]);  //, conn
+            'CS', rider_id, name, country_code, contact_no, vehicle_id, slot_id, slotDateTime, pickup_address, parking_number, parking_floor, price, order_status, pickup_latitude, pickup_longitude, device_name, area, address_id
+        ]);
 
         if(insert.affectedRows === 0) return resp.json({status:0, code:200, message : ["Oops! Something went wrong. Please try again."]}); 
 

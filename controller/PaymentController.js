@@ -274,7 +274,7 @@ export const redeemCoupon = async (req, resp) => {
     });
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
     const [[{ count }]] = await db.execute('SELECT COUNT(*) AS count FROM coupon WHERE coupan_code = ?',[coupon_code]);
-    if (count === 0) return resp.json({ status: 0, code: 422, message: ['The coupon code you entered does not exist in our records.'] });
+    if (count === 0) return resp.json({ status: 0, code: 422, message: ['The coupon you entered is not valid.'] });
 
     const coupon = await queryDB(`
         SELECT
@@ -286,30 +286,46 @@ export const redeemCoupon = async (req, resp) => {
     `, [rider_id, coupon_code]); 
 
     if (moment(coupon.end_date).isBefore(moment(), 'day') || coupon.status < 1){
-        return resp.json({ errors: {coupon_code: ["Coupon is invalid or expired."]} });
+        return resp.json({ status: 0, code: 422, message: ["The coupon you entered has expired."]} );
 
     } else if(coupon.booking_for != booking_type){
-        return resp.json({ errors: {booking_type: ["Coupon code is invalid for this booking type."]} });
+        return resp.json({ status: 0, code: 422, message : ["Coupon code is invalid for this booking type."]} );
 
     } else if(coupon.use_count >= coupon.user_per_user){
-        return resp.json({ errors: {coupon_code: ["Coupon per user limit exceeded."]} });
+        return resp.json({ status: 0, code: 422, message: ["This coupon code has already been used the maximum number of times."]} );
     }
-    const t_vat_amt   = Math.floor(( amount ) * 5) / 100; 
-    const totalAmount = parseFloat(amount) + parseFloat( t_vat_amt );  
-    
-    const disAmount   = (totalAmount * coupon.coupan_percentage)/100;
-    const finalAmount = totalAmount - disAmount;
+    const data = {}; 
+    if ( coupon.coupan_percentage != parseFloat(100) ) {
+        const dis_price = ( amount  * coupon.coupan_percentage ) /100;
+        const total_amt = amount - dis_price;
+        
+        data.dis_price  = dis_price;
+        data.t_vat_amt  = Math.round(( total_amt ) * 5) / 100;
+        data.total_amt  = total_amt + data.t_vat_amt;
+
+    } else {
+        data.t_vat_amt  = Math.round(( amount ) * 5) / 100;
+        const total_amt  = parseFloat(amount) + parseFloat( data.t_vat_amt ); 
+
+        const dis_price = ( total_amt * coupon.coupan_percentage)/100;
+        data.dis_price  = dis_price;
+        data.total_amt  = total_amt - dis_price;
+    }
+    const t_vat_amt   = data.t_vat_amt; //Math.floor(( amount ) * 5) / 100; 
+    // const totalAmount = parseFloat(amount) + parseFloat( t_vat_amt );  
+    const disAmount   = data.dis_price; //(totalAmount * coupon.coupan_percentage)/100;
+    const finalAmount = data.total_amt; //totalAmount - disAmount;
 
     return resp.json({
-        bookingAmount : formatNumber(amount),
-        vat_amt       : formatNumber(t_vat_amt),
-        totalAmount   : formatNumber(totalAmount),
-        discount      : formatNumber(disAmount),
-        data          : formatNumber(finalAmount),  //formatNumber(finalAmount),
+        bookingAmount     : formatNumber(amount),
+        vat_amt           : formatNumber(t_vat_amt),
+        // totalAmount       : formatNumber(totalAmount),
+        discount          : formatNumber(disAmount),
+        data              : formatNumber(finalAmount),  //formatNumber(finalAmount),
         coupan_percentage : coupon.coupan_percentage,
-        message       : [],
-        status        : 1,
-        code          : 200
+        message           : ['Your discount has been successfully applied. Enjoy the savings!'],
+        status            : 1,
+        code              : 200
     });
 };
 

@@ -5,7 +5,7 @@ import emailQueue from "../../emailQueue.js";
 import validateFields from "../../validation.js";
 import { insertRecord, queryDB, getPaginatedData, updateRecord } from '../../dbUtils.js';
 import db from "../../config/db.js";
-import { asyncHandler, createNotification, formatDateTimeInQuery, mergeParam, pushNotification } from '../../utils.js';
+import { asyncHandler, createNotification, formatDateTimeInQuery, mergeParam, checkCoupon } from '../../utils.js';
 dotenv.config();
 import { tryCatchErrorHandler } from "../../middleware/errorHandler.js";
 
@@ -25,7 +25,7 @@ export const upload = multer({ storage: storage });
 export const addRoadAssistance = asyncHandler(async (req, resp) => {
     // const { rider_id, name, country_code, contact_no, types_of_issue, pickup_address, drop_address, price, pickup_latitude, pickup_longitude, drop_latitude, drop_longitude, order_status=''} = mergeParam(req);
 
-    const { rider_id, user_name, country_code, contact_no, address, latitude, longitude, vehicle_id, address_id,  parking_number = '', parking_floor = '', service_price = 0, device_name = ''
+    const { rider_id, user_name, country_code, contact_no, address, latitude, longitude, vehicle_id, address_id,  parking_number = '', parking_floor = '', service_price = 0, device_name = '', coupon_code=''
     } = mergeParam(req);
 
     const { isValid, errors } = validateFields(mergeParam(req), {
@@ -43,10 +43,45 @@ export const addRoadAssistance = asyncHandler(async (req, resp) => {
 
     // const conn = await startTransaction();
     try {
+
+        const riderAddress = await queryDB(`
+            SELECT 
+                landmark,
+                (SELECT count(id) from riders_vehicles where rider_id =? and vehicle_id = ? ) as vehicle_count,
+                ( SELECT roadside_assistance_price FROM booking_price LIMIT 1) as booking_price
+            FROM 
+                rider_address
+            WHERE 
+                rider_id =? and address_id = ? order by id desc
+            LIMIT 1 `,
+        [ rider_id, vehicle_id, rider_id, address_id ]);
+
+        if(!riderAddress) return resp.json({ message : ["Address Id not valid!"], status: 0, code: 422, error: true });
+        if(riderAddress.vehicle_count == 0) return resp.json({ message : ["Vehicle Id not valid!"], status: 0, code: 422, error: true });
+
+        const vatAmt       = Math.floor(( parseFloat(riderAddress.booking_price) ) * 5) / 100; 
+        const bookingPrice = Math.floor( ( parseFloat(riderAddress.booking_price) + vatAmt ) * 100) ;
+
+        if(parseFloat(service_price) != bookingPrice && coupon_code == '') { 
+            return resp.json({ message : ['coupon_code is required'], status: 0, code: 422, error: true });
+        }
+        else if(parseFloat(service_price) != bookingPrice && coupon_code) {
+            const servicePrice = parseFloat(service_price) ;
+            const couponData   = await checkCoupon(rider_id, 'Roadside Assistance', coupon_code);
+            console.log(couponData)
+            if(couponData.status == 0 ){
+                return resp.json({ message : [couponData.message], status: 0, code: 422, error: true });
+
+            } else if(servicePrice != couponData.service_price ){
+                return resp.json({ message : ['Booking price is not valid!'], status: 0, code: 422, error: true, bookingPrice, servicePrice, couponprice : couponData.service_price });
+            }
+        }  
+        // return resp.json({ message : ['Service price Sahi hai!'], status: 1, bookingPrice });
+        const area   = riderAddress.landmark;
         const insert = await insertRecord('road_assistance', [
-            'request_id', 'rider_id', 'name', 'country_code', 'contact_no', 'address_id', 'pickup_address', 'pickup_latitude', 'pickup_longitude', 'parking_number', 'parking_floor', 'vehicle_id', 'price', 'order_status', 'device_name'
+            'request_id', 'rider_id', 'name', 'country_code', 'contact_no', 'address_id', 'pickup_address', 'pickup_latitude', 'pickup_longitude', 'parking_number', 'parking_floor', 'vehicle_id', 'price', 'order_status', 'device_name', 'area'
         ], [
-            'RAO', rider_id, user_name, country_code, contact_no, address_id, address, latitude, longitude, parking_number, parking_floor, vehicle_id, service_price, 'PNR', device_name
+            'RAO', rider_id, user_name, country_code, contact_no, address_id, address, latitude, longitude, parking_number, parking_floor, vehicle_id, service_price, 'PNR', device_name, area
         ]); //, conn
 
         if(insert.affectedRows === 0) return resp.json({status:0, code:200, message: ['Oops! There is something went wrong! Please Try Again.']});

@@ -28,7 +28,7 @@ import {
 } from '../controller/api/DiscussionBoardController.js';
 
 import {vehicleList, vehicleDetail, interestedPeople, areaList, sellVehicle, allSellVehicleList, sellVehicleList,
-    sellVehicleDetail, updateSellVehicle, deleteSellVehicle, soldSellVehicle, reminder_sell_vehicle_list, vehicleModelList, vehicleBrandList, updateSellVehicleImg
+    sellVehicleDetail, updateSellVehicle, deleteSellVehicle, soldSellVehicle, reminder_sell_vehicle_list, vehicleModelList, vehicleBrandList, updateSellVehicleImg, dubaiAreaList
 } from '../controller/api/VehicleController.js';
 import { 
     chargerList, chargerBooking, chargerBookingList,chargerBookingDetail, invoiceList, getPcSlotList, getPcSubscriptionList, userCancelPCBooking,
@@ -72,8 +72,9 @@ const authzRoutes = [
     { method: 'get',  path: '/reminder-sell-vehicle-list', handler: reminder_sell_vehicle_list },
     { method: 'post', path: '/vehicle-brand-list',         handler: vehicleBrandList },
     { method: 'post', path: '/vehicle-model-list',         handler: vehicleModelList },
+    { method: 'get',  path: '/dubai-area-list',            handler: dubaiAreaList },
 
-    // { method: 'get',  path: '/auto-cancel-booking',         handler: autoCancelBooking },
+    // { method: 'get',  path: '/auto-cancel-booking',          handler: autoCancelBooking },
 ];
 authzRoutes.forEach(({ method, path, handler }) => {
     const middlewares = [apiAuthorization];  // rateLimit

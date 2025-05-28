@@ -481,3 +481,25 @@ export const vehicleBrandList = asyncHandler(async (req, resp) => {
     });
 });
 
+
+export const dubaiAreaList = asyncHandler(async (req, resp) => {
+    const { area_name } = mergeParam(req);
+
+    let query         = `SELECT area_name FROM dubai_area WHERE status = ?`;
+    const queryParams = [1];
+
+    if(area_name){
+        query += ` AND area_name LIKE ?`;
+        queryParams.push(`%${area_name}%`);
+    }
+    query += ` ORDER BY area_name ASC`;
+
+    const [result] = await db.execute(query, queryParams);
+
+    return resp.json({
+        status    : 1, 
+        code      : 200,
+        message   : ["Dubai Area List fetch successfully!"],
+        area_data : result
+    });
+});

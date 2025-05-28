@@ -422,6 +422,7 @@ const chargerPickedUp = async (req, resp) => {
             // };
             emailQueue.addEmail(bookingData.data.rider_email, 'PlusX Electric: Your EV Roadside Assistance Service is Now Complete', html);  //, attachment
         // }
+        // console.log('RRAAA')
         await rsaInvoice(checkOrder.rider_id, booking_id); 
         
         return resp.json({ message: [' Charger picked-up successfully!'], status: 1, code: 200 });

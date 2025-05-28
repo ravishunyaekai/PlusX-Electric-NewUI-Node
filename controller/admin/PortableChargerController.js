@@ -180,7 +180,7 @@ export const deleteCharger = async (req, resp) => {
 
 export const chargerBookingList = async (req, resp) => {
     try {
-        const { page_no, booking_id, name, contact, status, start_date, end_date, search_text = '', scheduleFilters, areaSelected } = req.body;
+        const { page_no, booking_id, name, contact, status, start_date, end_date, search_text = '', scheduleFilters, areaSelected, rowSelected } = req.body;
 
         const { isValid, errors } = validateFields(req.body, { page_no : ["required"] });
         if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
@@ -193,7 +193,7 @@ export const chargerBookingList = async (req, resp) => {
             sortColumn : 'slot_date DESC, slot_time ASC',
             sortOrder  : '',
             page_no,
-            limit            : 10,
+            limit            : rowSelected || 10,
             liveSearchFields : ['booking_id', 'user_name' ],
             liveSearchTexts  : [search_text, search_text ],
             whereField       : ['status'],
@@ -409,7 +409,8 @@ export const invoiceDetails = async (req, resp) => {
         SELECT 
             invoice_id, invoice_date, currency, 
             pcb.user_name, pcb.booking_id, 
-            (SELECT coupan_percentage FROM coupon_usage WHERE booking_id = pci.request_id) AS discount
+            (SELECT coupan_percentage FROM coupon_usage WHERE booking_id = pci.request_id) AS discount,
+            (SELECT portable_price FROM booking_price LIMIT 1) as booking_price
         FROM 
             portable_charger_invoice AS pci 
         LEFT JOIN 
@@ -423,20 +424,42 @@ export const invoiceDetails = async (req, resp) => {
     //     data[key] ? data[key].split(',').map(Number) : []
     // );
     // const chargingLevelSum = chargingLevels[0].reduce((sum, startLevel, index) => sum + (startLevel - chargingLevels[1][index]), 0);
-    
+
     data.kw           = 25; //chargingLevelSum * 0.25;
     data.kw_dewa_amt  = data.kw * 0.44;
     data.kw_cpo_amt   = data.kw * 0.26;
-    data.delv_charge  = (30 - (data.kw_dewa_amt + data.kw_cpo_amt) ); //when start accepting payment
-    data.t_vat_amt    = ( (data.kw_dewa_amt + data.kw_cpo_amt  + data.delv_charge )  * 5) / 100 ;
-    data.price        = data.kw_dewa_amt + data.kw_cpo_amt + data.delv_charge + data.t_vat_amt;
+    data.delv_charge  = (parseFloat( data.booking_price) - (data.kw_dewa_amt + data.kw_cpo_amt) ); //when start accepting payment
+    // data.t_vat_amt    = ( (data.kw_dewa_amt + data.kw_cpo_amt  + data.delv_charge )  * 5) / 100 ;
+    // data.price        = data.kw_dewa_amt + data.kw_cpo_amt + data.delv_charge + data.t_vat_amt;
+    // data.dis_price    = 0;
+    // if(data.discount > 0) { 
+
+    //     const dis_price = ( data.price  * data.discount ) /100
+    //     data.dis_price  = dis_price;
+    //     data.price      = data.price - dis_price ;
+    // } 
     data.dis_price    = 0;
     if(data.discount > 0){
+        if ( data.discount != parseFloat(100) ) {  
+            const dis_price = ( parseFloat( data.booking_price) * data.discount ) /100 ;
+            const total_amt = parseFloat( data.booking_price) - dis_price;  
 
-        const dis_price = ( data.price  * data.discount ) /100
-        data.dis_price  = dis_price;
-        data.price      = data.price - dis_price ;
-    } 
+            data.dis_price  = dis_price ;
+            data.t_vat_amt  = Math.floor(( total_amt ) * 5) / 100; 
+            data.price      = total_amt + data.t_vat_amt;
+
+        } else {
+            data.t_vat_amt  = Math.floor(( parseFloat( data.booking_price) ) * 5) / 100;
+            const total_amt  = parseFloat( parseFloat( data.booking_price)) + parseFloat( data.t_vat_amt ); 
+
+            const dis_price = ( total_amt * data.discount)/100;
+            data.dis_price  = dis_price;
+            data.price      = total_amt - dis_price;
+        }
+    } else {
+        data.t_vat_amt = ( ( parseFloat( data.booking_price) )  * 5) / 100 ;
+        data.price     = parseFloat( data.booking_price) + data.t_vat_amt;
+    }
     return resp.json({
         message : ["Portable Charger Invoice Details fetched successfully!"],
         data    : data,

@@ -7,7 +7,7 @@ import emailQueue from "../../emailQueue.js";
 import validateFields from "../../validation.js";
 import { queryDB, getPaginatedData, insertRecord, updateRecord } from '../../dbUtils.js';
 import db from "../../config/db.js";
-import { asyncHandler, createNotification, formatDateInQuery, formatDateTimeInQuery, mergeParam, pushNotification } from "../../utils.js";
+import { asyncHandler, createNotification, formatDateInQuery, formatDateTimeInQuery, mergeParam, pushNotification, checkCoupon } from "../../utils.js";
 dotenv.config();
 import { tryCatchErrorHandler } from "../../middleware/errorHandler.js";
 
@@ -88,7 +88,7 @@ export const getPcSlotList = asyncHandler(async (req, resp) => {
 export const chargerBooking = asyncHandler(async (req, resp) => {
 
     const { rider_id, user_name, country_code, contact_no, address, latitude, longitude, parking_number='',
-        parking_floor='', vehicle_id, slot_date, slot_time, slot_id, service_name, service_type, service_feature, service_price = '', address_id, device_name =''
+        parking_floor='', vehicle_id, slot_date, slot_time, slot_id, service_name, service_type, service_feature, service_price = 0, address_id, device_name ='', coupon_code=''
     } = mergeParam(req); //, area
 
     const { isValid, errors } = validateFields(mergeParam(req), {
@@ -112,19 +112,21 @@ export const chargerBooking = asyncHandler(async (req, resp) => {
         // area            : ["required"],
     });
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
-
+    
     // const conn = await startTransaction();
     try {
         // await conn.beginTransaction(); 
         const riderAddress = await queryDB(`
             SELECT 
-                landmark, (select address_alert from portable_charger_booking where rider_id =? and address = ? order by id desc LIMIT 1)
+                landmark, (SELECT address_alert from portable_charger_booking where rider_id =? and address = ? order by id desc LIMIT 1) as address_alert,
+                (SELECT count(id) from riders_vehicles where rider_id =? and vehicle_id = ? ) as vehicle_count,
+                ( SELECT portable_price FROM booking_price LIMIT 1) as booking_price
             FROM 
                 rider_address
             WHERE 
                 rider_id =? and address_id = ? order by id desc
             LIMIT 1 `,
-        [ rider_id, address, rider_id, address_id ]);
+        [ rider_id, address, rider_id, vehicle_id, rider_id, address_id ]);
 
         // const riderdata = await queryDB(`
         //     SELECT 
@@ -135,8 +137,28 @@ export const chargerBooking = asyncHandler(async (req, resp) => {
         //         rider_id =? and address = ? order by id desc
         //     LIMIT 1 `,
         // [ rider_id, address ]);
-
+        
         if(!riderAddress) return resp.json({ message : ["Address Id not valid!"], status: 0, code: 422, error: true });
+        if(riderAddress.vehicle_count == 0) return resp.json({ message : ["Vehicle Id not valid!"], status: 0, code: 422, error: true });
+
+        const vatAmt       = Math.floor(( parseFloat(riderAddress.booking_price) ) * 5) / 100; 
+        const bookingPrice = Math.floor( ( parseFloat(riderAddress.booking_price) + vatAmt ) * 100) ;
+
+        if(parseFloat(service_price) != bookingPrice && coupon_code == '') { 
+            return resp.json({ message : ['coupon_code is required'], status: 0, code: 422, error: true });
+        }
+        else if(parseFloat(service_price) != bookingPrice && coupon_code) {
+            const servicePrice = parseFloat(service_price) ;
+            const couponData   = await checkCoupon(rider_id, 'POD-On Demand Service', coupon_code);
+            
+            if(couponData.status == 0 ){
+                return resp.json({ message : [couponData.message], status: 0, code: 422, error: true });
+
+            } else if(servicePrice != couponData.service_price ){
+                return resp.json({ message : ['Booking price is not valid!'], status: 0, code: 422, error: true, bookingPrice : couponData.service_price });
+            }
+        }  
+        // return resp.json({ message : ['Service price Sahi hai!'], status: 1, bookingPrice });
 
         const addressAlert = riderAddress.address_alert || '';
         const area         = riderAddress.landmark;
@@ -550,29 +572,28 @@ export const userFeedbackPCBooking = asyncHandler(async (req, resp) => {
 
 export const reScheduleBooking = asyncHandler(async (req, resp) => {
     
-    const { rider_id, booking_id, user_name, country_code, contact_no, address, latitude, longitude, parking_number='',
-        parking_floor='', vehicle_id, slot_date, slot_time, slot_id, service_name, service_type, service_feature, service_price = 0, address_id, device_name
-    } = mergeParam(req);
+    const { rider_id, booking_id, slot_date, slot_time, slot_id, device_name } = mergeParam(req);
+    // user_name, country_code, contact_no, address, latitude, longitude, parking_number='', parking_floor='', vehicle_id, service_name, service_type, service_feature, service_price = 0, address_id,
 
     const { isValid, errors } = validateFields(mergeParam(req), {
         rider_id        : ["required"],
         booking_id      : ["required"],
-        user_name       : ["required"],
-        country_code    : ["required"],
-        contact_no      : ["required"],
-        address         : ["required"],
-        latitude        : ["required"],
-        longitude       : ["required"],
+        // user_name       : ["required"],
+        // country_code    : ["required"],
+        // contact_no      : ["required"],
+        // address         : ["required"],
+        // latitude        : ["required"],
+        // longitude       : ["required"],
         // parking_number  : ["required"],
         // parking_floor   : ["required"],
-        vehicle_id      : ["required"],
+        // vehicle_id      : ["required"],
         slot_date       : ["required"],
         slot_time       : ["required"],
         slot_id         : ["required"],
-        service_name    : ["required"],
-        service_type    : ["required"],
-        service_feature : ["required"],
-        address_id      : ["required"],
+        // service_name    : ["required"],
+        // service_type    : ["required"],
+        // service_feature : ["required"],
+        // address_id      : ["required"],
         device_name     : ["required"],
     });  
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
@@ -617,10 +638,19 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
         let timeZone = moment().tz("Asia/Dubai");
         let prevDay  = timeZone.subtract(28, 'hours').format('YYYY-MM-DD HH:mm:ss');
 
+        // 'vehicle_id', 'service_name', 'service_price', 'service_type', 'service_feature', 'user_name', 'country_code', 'contact_no', 'slot', 'slot_date', 'slot_time', 'address', 'latitude', 'longitude', 'status', 'address_alert', 'parking_number', 'parking_floor', 'address_id', 'device_name', 'area'
+
         const checkOrder = await queryDB(`
-            SELECT rd.fcm_token, rd.rider_email, 
+            SELECT
+                pcb.vehicle_id, pcb.service_name, pcb.service_price, pcb.service_type,
+                pcb.service_feature, pcb.user_name, pcb.country_code, pcb.contact_no, pcb.slot,
+                pcb.slot_date, pcb.slot_time, pcb.address, pcb.latitude, pcb.longitude,
+                pcb.address_alert, pcb.parking_number, pcb.parking_floor, pcb.address_id,
+                pcb.area, pcb.payment_intent_id, pcb.rescheduled_booking, 
+
+                rd.fcm_token, rd.rider_email, 
                 (SELECT CONCAT(vehicle_make, "-", vehicle_model) FROM riders_vehicles as rv WHERE rv.vehicle_id = pcb.vehicle_id ) AS vehicle_data,
-                (SELECT COUNT(id) FROM portable_charger_booking as pod2 WHERE pod2.rider_id = ? AND pod2.status = 'C' and pod2.created_at >= ? ) AS last_cancel_booking,
+                (SELECT COUNT(id) FROM portable_charger_booking as pod2 WHERE pod2.rider_id = ? AND pod2.status = 'C' and pod2.updated_at >= ? ) AS last_cancel_booking,
                 (SELECT address_alert FROM portable_charger_booking WHERE rider_id = ? AND address = ? ORDER BY id DESC LIMIT 1) AS alert_add
             FROM 
                 portable_charger_booking as pcb
@@ -638,10 +668,21 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
         if (!checkOrder) {
             return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 404 });
         }
+        if (checkOrder.rescheduled_booking) {
+            return resp.json({ message: [`This booking has already been rescheduled.`], status: 0, code: 404 });
+        }
         const { fcm_token, rider_email, vehicle_data, last_cancel_booking, alert_add } = checkOrder; 
 
         if ( last_cancel_booking == 0 ) return resp.json({ message : ["You can't re-schedule this booking because  your order is greater than 24 hrs."], status: 0, code: 405, error: true });
     
+
+        const insertB = await insertRecord('portable_charger_booking', [
+            'booking_id', 'rider_id', 'vehicle_id', 'service_name', 'service_price', 'service_type', 'service_feature', 'user_name', 'country_code', 'contact_no', 'slot', 'slot_date', 'slot_time', 'address', 'latitude', 'longitude', 'status', 'address_alert', 'parking_number', 'parking_floor', 'address_id', 'device_name', 'area'
+        ], [
+            'RS-'+booking_id, rider_id, vehicle_id, service_name, service_price, service_type, service_feature, user_name, country_code, contact_no, slot_id, fSlotDate, slot_time, address, latitude, longitude, 'PNR', addressAlert, parking_number, parking_floor, address_id, device_name, area
+        ]);
+
+
         const updtFields = {
             status        : 'CNF', 
             slot          : slot_id, 

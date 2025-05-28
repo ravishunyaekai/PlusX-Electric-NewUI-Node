@@ -2,7 +2,7 @@ import db from '../../config/db.js';
 import dotenv from 'dotenv';
 import moment from 'moment';
 import crypto from 'crypto';
-import { mergeParam, asyncHandler, getOpenAndCloseTimings, convertTo24HourFormat, formatDateTimeInQuery, formatDateInQuery, createNotification, pushNotification} from '../../utils.js';
+import { mergeParam, asyncHandler, getOpenAndCloseTimings, convertTo24HourFormat, formatDateTimeInQuery, formatDateInQuery, createNotification, pushNotification } from '../../utils.js';
 import { queryDB, getPaginatedData, insertRecord, updateRecord } from '../../dbUtils.js';
 import emailQueue from '../../emailQueue.js';
 import validateFields from "../../validation.js";
@@ -11,53 +11,49 @@ dotenv.config();
 
 export const bookingList = async (req, resp) => {
     try {
-        const { page_no, request_id, name, contact_no, order_status, start_date, end_date, search_text  } = req.body;
-        const { isValid, errors } = validateFields(req.body, {page_no: ["required"]});
+        const { page_no, order_status, start_date, end_date, search_text, rowSelected } = req.body;
+        const { isValid, errors } = validateFields(req.body, { page_no: ["required"] });
         if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
 
         const params = {
-            tableName: 'charging_service',
-            columns: `request_id, rider_id, name, order_status, ROUND(price/100, 2) AS price, ${formatDateTimeInQuery(['created_at'])},
+            tableName : 'charging_service',
+            columns   : `request_id, rider_id, name, order_status, ROUND(price/100, 2) AS price, ${formatDateTimeInQuery(['created_at'])},
             (select rsa_name from rsa where rsa.rsa_id = charging_service.rsa_id) as rsa_name`,
-            sortColumn: 'created_at',
-            sortOrder: 'DESC',
+            sortColumn : 'created_at',
+            sortOrder  : 'DESC',
             page_no,
-            limit: 10,
-            // searchFields: ['request_id', 'name', 'contact_no', 'order_status'],
-            // searchTexts: [request_id, name, contact_no, order_status],
-            liveSearchFields: ['request_id', 'name'],
-            liveSearchTexts: [search_text, search_text],
-            whereField    : ['order_status'],
-            whereValue    : ['PNR'],
-            whereOperator : ["!="]
+            limit            : rowSelected || 10,
+            liveSearchFields : ['request_id', 'name'],
+            liveSearchTexts  : [search_text, search_text],
+            whereField       : ['order_status'],
+            whereValue       : ['PNR'],
+            whereOperator    : ["!="]
         };
-
         if (start_date && end_date) {
             // const start = moment(start_date, "YYYY-MM-DD").startOf('day').format("YYYY-MM-DD HH:mm:ss");
             // const end = moment(end_date, "YYYY-MM-DD").endOf('day').format("YYYY-MM-DD HH:mm:ss");
             const startToday = new Date(start_date);
             const startFormattedDate = `${startToday.getFullYear()}-${(startToday.getMonth() + 1).toString()
                 .padStart(2, '0')}-${startToday.getDate().toString().padStart(2, '0')}`;
-                        
-            const givenStartDateTime    = startFormattedDate+' 00:00:01'; // Replace with your datetime string
+
+            const givenStartDateTime = startFormattedDate + ' 00:00:01'; // Replace with your datetime string
             const modifiedStartDateTime = moment(givenStartDateTime).subtract(4, 'hours'); // Subtract 4 hours
-            const start        = modifiedStartDateTime.format('YYYY-MM-DD HH:mm:ss')
-            
+            const start = modifiedStartDateTime.format('YYYY-MM-DD HH:mm:ss')
+
             const endToday = new Date(end_date);
             const formattedEndDate = `${endToday.getFullYear()}-${(endToday.getMonth() + 1).toString()
                 .padStart(2, '0')}-${endToday.getDate().toString().padStart(2, '0')}`;
-            const end = formattedEndDate+' 19:59:59';
+            const end = formattedEndDate + ' 19:59:59';
 
-            params.whereField = ['created_at', 'created_at'];
-            params.whereValue = [start, end];
-            params.whereOperator = ['>=', '<='];
+            params.whereField.push('created_at', 'created_at');
+            params.whereValue.push(start, end);
+            params.whereOperator.push('>=', '<=');
         }
-        if(order_status) {
+        if (order_status) {
             params.whereField.push('order_status');
             params.whereValue.push(order_status);
             params.whereOperator.push('=');
         }
-
         const result = await getPaginatedData(params);
 
         return resp.json({
@@ -82,9 +78,9 @@ export const bookingDetails = async (req, resp) => {
 
         if (!request_id) {
             return resp.status(400).json({
-                status  : 0,
-                code    : 400,
-                message : 'Booking ID is required.',
+                status: 0,
+                code: 400,
+                message: 'Booking ID is required.',
             });
         }
         const result = await db.execute(`
@@ -98,14 +94,14 @@ export const bookingDetails = async (req, resp) => {
             FROM 
                 charging_service cs
             WHERE 
-                cs.request_id = ?`, 
+                cs.request_id = ?`,
             [request_id]
         );
         if (result.length === 0) {
             return resp.status(404).json({
-                status  : 0,
-                code    : 404,
-                message : 'Booking not found.',
+                status: 0,
+                code: 404,
+                message: 'Booking not found.',
             });
         }
         const [history] = await db.execute(`SELECT order_status, cancel_by, cancel_reason as reason, ${formatDateTimeInQuery(['created_at'])}, image, 
@@ -119,23 +115,23 @@ export const bookingDetails = async (req, resp) => {
                 charging_service_feedback 
             WHERE 
                 booking_id = ?
-            LIMIT 1`, 
-        [request_id]);
+            LIMIT 1`,
+            [request_id]);
 
         return resp.json({
-            status  : 1,
-            code    : 200,
-            message : ["Pick and Drop booking details fetched successfully!"],
-            data    : result[0], 
+            status: 1,
+            code: 200,
+            message: ["Pick and Drop booking details fetched successfully!"],
+            data: result[0],
             history,
-            imageUrl : `${req.protocol}://${req.get('host')}/uploads/pick-drop-images/`,
+            imageUrl: `${req.protocol}://${req.get('host')}/uploads/pick-drop-images/`,
             feedBack
         });
     } catch (error) {
-        return resp.status(500).json({ 
-            status  : 0, 
-            code    : 500, 
-            message : 'Error fetching booking details' 
+        return resp.status(500).json({
+            status: 0,
+            code: 500,
+            message: 'Error fetching booking details'
         });
     }
 };
@@ -161,16 +157,16 @@ export const pdInvoiceList = async (req, resp) => {
             const startToday = new Date(start_date);
             const startFormattedDate = `${startToday.getFullYear()}-${(startToday.getMonth() + 1).toString()
                 .padStart(2, '0')}-${startToday.getDate().toString().padStart(2, '0')}`;
-                        
-            const givenStartDateTime    = startFormattedDate+' 00:00:01'; // Replace with your datetime string
+
+            const givenStartDateTime = startFormattedDate + ' 00:00:01'; // Replace with your datetime string
             const modifiedStartDateTime = moment(givenStartDateTime).subtract(4, 'hours'); // Subtract 4 hours
-            const start        = modifiedStartDateTime.format('YYYY-MM-DD HH:mm:ss')
-            
+            const start = modifiedStartDateTime.format('YYYY-MM-DD HH:mm:ss')
+
             const endToday = new Date(end_date);
             const formattedEndDate = `${endToday.getFullYear()}-${(endToday.getMonth() + 1).toString()
                 .padStart(2, '0')}-${endToday.getDate().toString().padStart(2, '0')}`;
-            const end = formattedEndDate+' 19:59:59';
-    
+            const end = formattedEndDate + ' 19:59:59';
+
             whereFields.push('created_at', 'created_at');
             whereValues.push(start, end);
             whereOperators.push('>=', '<=');
@@ -220,7 +216,8 @@ export const pdInvoiceDetails = asyncHandler(async (req, resp) => {
         SELECT 
             invoice_id, amount AS price, ${formatDateInQuery(['invoice_date'])},
             currency, cs.name, cs.request_id,
-            (SELECT coupan_percentage FROM coupon_usage WHERE booking_id = csi.request_id) AS discount
+            (SELECT coupan_percentage FROM coupon_usage WHERE booking_id = csi.request_id) AS discount,
+            (SELECT pick_drop_price FROM booking_price LIMIT 1) as booking_price
         FROM 
             charging_service_invoice AS csi
         LEFT JOIN
@@ -229,14 +226,36 @@ export const pdInvoiceDetails = asyncHandler(async (req, resp) => {
             csi.invoice_id = ?
     `, [invoice_id]);
 
-    invoice.servicePrice = 39; 
-    invoice.t_vat_amt    = ( invoice.servicePrice * 5) / 100 ;
-    invoice.price        = invoice.servicePrice + invoice.t_vat_amt;
+    invoice.servicePrice = parseFloat(invoice.booking_price);
+    // invoice.t_vat_amt    = (invoice.servicePrice * 5) / 100;
+    // invoice.price        = invoice.servicePrice + invoice.t_vat_amt;
+    // invoice.dis_price    = 0;
+    // if (invoice.discount > 0) {
+    //     const dis_price = (invoice.price * invoice.discount) / 100;
+    //     invoice.dis_price = dis_price;
+    //     invoice.price = invoice.price - dis_price;
+    // }
     invoice.dis_price    = 0;
     if(invoice.discount > 0){
-        const dis_price   = ( invoice.price  * invoice.discount ) /100 ;
-        invoice.dis_price = dis_price;
-        invoice.price     = invoice.price - dis_price ;
+        if ( invoice.discount != parseFloat(100) ) {  
+            const dis_price = ( invoice.servicePrice * invoice.discount ) /100 ;
+            const total_amt = invoice.servicePrice - dis_price;  
+
+            invoice.dis_price  = dis_price ;
+            invoice.t_vat_amt  = Math.floor(( total_amt ) * 5) / 100; 
+            invoice.price      = total_amt + invoice.t_vat_amt;
+
+        } else {
+            invoice.t_vat_amt  = Math.floor(( invoice.servicePrice ) * 5) / 100;
+            const total_amt  = parseFloat( invoice.servicePrice) + parseFloat( invoice.t_vat_amt ); 
+
+            const dis_price = ( total_amt * invoice.discount)/100;
+            invoice.dis_price  = dis_price;
+            invoice.price      = total_amt - dis_price;
+        }
+    } else {
+        invoice.t_vat_amt = ( ( invoice.servicePrice )  * 5) / 100 ;
+        invoice.price     = invoice.servicePrice + invoice.t_vat_amt;
     }
     return resp.json({
         message  : ["Pick & Drop Invoice Details fetched successfully!"],
@@ -251,7 +270,7 @@ export const pdInvoiceDetails = asyncHandler(async (req, resp) => {
 /* Slot */
 export const pdSlotList = async (req, resp) => {
     try {
-        const { page_no, search_text='', start_date, end_date } = req.body;
+        const { page_no, search_text = '', start_date, end_date } = req.body;
         const { isValid, errors } = validateFields(req.body, { page_no: ["required"] });
         if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
 
@@ -261,10 +280,10 @@ export const pdSlotList = async (req, resp) => {
             columns: `slot_id, start_time, end_time, booking_limit, status, ${formatDateTimeInQuery(['created_at'])},${formatDateInQuery(['slot_date'])}, 
                 (SELECT COUNT(id) FROM charging_service AS cs WHERE DATE(cs.slot_date_time) = pick_drop_slot.slot_date AND TIME(slot_date_time) = pick_drop_slot.start_time AND order_status NOT IN ("WC", "C") ) AS slot_booking_count
             `,
-            sortColumn : 'slot_date DESC, start_time ASC',
-            sortOrder  : '',
+            sortColumn: 'slot_date DESC, start_time ASC',
+            sortOrder: '',
             page_no,
-            limit      : 10,
+            limit: 10,
             liveSearchFields: ['slot_id',],
             liveSearchTexts: [search_text,],
             whereField: [],
@@ -282,12 +301,12 @@ export const pdSlotList = async (req, resp) => {
         const result = await getPaginatedData(params);
 
         return resp.json({
-            status     : 1,
-            code       : 200,
-            message    : ["Pick & Drop Slot List fetched successfully!"],
-            data       : result.data,
-            total_page : result.totalPage,
-            total      : result.total,
+            status: 1,
+            code: 200,
+            message: ["Pick & Drop Slot List fetched successfully!"],
+            data: result.data,
+            total_page: result.totalPage,
+            total: result.total,
         });
     } catch (error) {
         console.error('Error fetching slot list:', error);
@@ -297,7 +316,7 @@ export const pdSlotList = async (req, resp) => {
 
 export const pdSlotDetails = async (req, resp) => {
     try {
-        const { slot_id, slot_date} = req.body;
+        const { slot_id, slot_date } = req.body;
         const { isValid, errors } = validateFields(req.body, { slot_date: ["required"] });
         if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
         // , "PNR"
@@ -308,15 +327,15 @@ export const pdSlotDetails = async (req, resp) => {
             FROM 
                 pick_drop_slot 
             WHERE 
-                slot_date = ?`, 
+                slot_date = ?`,
             [slot_date]
         );
         return resp.json({
-            status  : 1,
-            code    : 200,
-            message : ["Portable And Drop Slot Details fetched successfully!"],
-            data    : slotDetails,
-            
+            status: 1,
+            code: 200,
+            message: ["Portable And Drop Slot Details fetched successfully!"],
+            data: slotDetails,
+
         });
     } catch (error) {
         console.error('Error fetching slot list:', error);
@@ -329,25 +348,25 @@ export const pdAddSlot = async (req, resp) => {
         const { slot_date, start_time, end_time, booking_limit, status = 1 } = req.body;
         const { isValid, errors } = validateFields(req.body, { slot_date: ["required"], start_time: ["required"], end_time: ["required"], booking_limit: ["required"], });
         if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
-        
-        if ( !Array.isArray(start_time) || !Array.isArray(end_time) || !Array.isArray(booking_limit) || !Array.isArray(status)) {
+
+        if (!Array.isArray(start_time) || !Array.isArray(end_time) || !Array.isArray(booking_limit) || !Array.isArray(status)) {
             return resp.json({ status: 0, code: 422, message: 'Input data must be in array format.' });
         }
-        if ( start_time.length !== end_time.length || end_time.length !== booking_limit.length || booking_limit.length !== status.length) {
+        if (start_time.length !== end_time.length || end_time.length !== booking_limit.length || booking_limit.length !== status.length) {
             return resp.json({ status: 0, code: 422, message: 'All input arrays must have the same length.' });
         }
 
         const values = []; const placeholders = [];
         const fSlotDate = moment(slot_date, "DD-MM-YYYY").format("YYYY-MM-DD");
-        for (let i = 0; i < start_time.length; i++) {            
-            const slotId = `PDS${generateUniqueId({ length:6 })}`;
+        for (let i = 0; i < start_time.length; i++) {
+            const slotId = `PDS${generateUniqueId({ length: 6 })}`;
             values.push(slotId, fSlotDate, convertTo24HourFormat(start_time[i]), convertTo24HourFormat(end_time[i]), booking_limit[i], status[i]);
             placeholders.push('(?, ?, ?, ?, ?, ?)');
         }
-        
+
         const query = `INSERT INTO pick_drop_slot (slot_id, slot_date, start_time, end_time, booking_limit, status) VALUES ${placeholders.join(', ')}`;
         const [insert] = await db.execute(query, values);
-        
+
         return resp.json({
             code: 200,
             message: insert.affectedRows > 0 ? ['Slots added successfully!'] : ['Oops! Something went wrong. Please try again.'],
@@ -362,11 +381,11 @@ export const pdAddSlot = async (req, resp) => {
 export const pdEditSlot = asyncHandler(async (req, resp) => {
     const { slot_id, slot_date, start_time, end_time, booking_limit, status } = req.body;
     const { isValid, errors } = validateFields(req.body, {
-        slot_id       : ["required"],
-        slot_date     : ["required"],
-        start_time    : ["required"],
-        end_time      : ["required"],
-        booking_limit : ["required"],
+        slot_id: ["required"],
+        slot_date: ["required"],
+        start_time: ["required"],
+        end_time: ["required"],
+        booking_limit: ["required"],
     });
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
 
@@ -384,7 +403,7 @@ export const pdEditSlot = asyncHandler(async (req, resp) => {
     let errMsg = [];
 
     //  Fetch existing slots for the given date
-    const [existingSlots] = await db.execute("SELECT slot_id FROM pick_drop_slot WHERE slot_date = ?",[fSlotDate]);
+    const [existingSlots] = await db.execute("SELECT slot_id FROM pick_drop_slot WHERE slot_date = ?", [fSlotDate]);
     const existingSlotIds = existingSlots.map((slot) => slot.slot_id);
 
     // Determine slots to delete
@@ -392,7 +411,7 @@ export const pdEditSlot = asyncHandler(async (req, resp) => {
 
     //Delete slots that are no longer needed
     for (let id of slotsToDelete) {
-        const [deleteResult] = await db.execute("DELETE FROM pick_drop_slot WHERE slot_id = ?", [id] );
+        const [deleteResult] = await db.execute("DELETE FROM pick_drop_slot WHERE slot_id = ?", [id]);
 
         if (deleteResult.affectedRows === 0) {
             errMsg.push(`Failed to delete slot with id ${id}.`);
@@ -451,7 +470,7 @@ export const pdEditSlot = asyncHandler(async (req, resp) => {
 
 export const pdDeleteSlot = async (req, resp) => {
     try {
-        const { slot_date } = req.body; 
+        const { slot_date } = req.body;
 
         const { isValid, errors } = validateFields(req.body, {
             slot_date: ["required"]
@@ -474,38 +493,38 @@ export const pdDeleteSlot = async (req, resp) => {
 /* Slot */
 
 export const PodAssignBooking = async (req, resp) => {
-    const {  rsa_id, booking_id  } = mergeParam(req);
-    const { isValid, errors }      = validateFields(mergeParam(req), {
-        rsa_id     : ["required"],
-        booking_id : ["required"],
+    const { rsa_id, booking_id } = mergeParam(req);
+    const { isValid, errors } = validateFields(mergeParam(req), {
+        rsa_id: ["required"],
+        booking_id: ["required"],
     });
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
     // const conn = await startTransaction();
-    
-    try{
+
+    try {
         // , (select fcm_token from riders as r where r.rider_id = charging_service.rider_id ) as fcm_token
-        const booking_data = await queryDB( `SELECT rider_id, rsa_id, slot_date_time FROM charging_service WHERE request_id = ?
-        `, [booking_id ] );
-    
+        const booking_data = await queryDB(`SELECT rider_id, rsa_id, slot_date_time FROM charging_service WHERE request_id = ?
+        `, [booking_id]);
+
         if (!booking_data) {
             return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 404 });
         }
         const rsa = await queryDB(`SELECT rsa_name, email, fcm_token FROM rsa WHERE rsa_id = ?`, [rsa_id]);
-        
-        if(rsa_id == booking_data.rsa_id) {
+
+        if (rsa_id == booking_data.rsa_id) {
             return resp.json({ message: `The booking is already assigned to Driver Name ${rsa.rsa_name}. Would you like to assign it to another driver?`, status: 0, code: 404 });
         }
-        if( booking_data.rsa_id) {
+        if (booking_data.rsa_id) {
             await db.execute(`DELETE FROM charging_service_assign WHERE order_id = ? AND rsa_id = ?`, [booking_id, booking_data.rsa_id]);
-        } 
-        await insertRecord('charging_service_assign', 
-            [ 'order_id', 'rider_id', 'rsa_id', 'slot_date_time', 'status' ], 
-            [ booking_id, booking_data.rider_id, rsa_id, booking_data.slot_date_time, 0 ]);
-        await updateRecord('charging_service', {rsa_id: rsa_id}, ['request_id'], [booking_id]);
-        
-        const href    = 'charging_service/' + booking_id;
+        }
+        await insertRecord('charging_service_assign',
+            ['order_id', 'rider_id', 'rsa_id', 'slot_date_time', 'status'],
+            [booking_id, booking_data.rider_id, rsa_id, booking_data.slot_date_time, 0]);
+        await updateRecord('charging_service', { rsa_id: rsa_id }, ['request_id'], [booking_id]);
+
+        const href = 'charging_service/' + booking_id;
         const heading = 'EV Pick Up & Drop Off Service!';
-        const desc    = `A Booking of the EV Pick Up & Drop Off service has been assigned to you with booking id : ${booking_id}`;
+        const desc = `A Booking of the EV Pick Up & Drop Off service has been assigned to you with booking id : ${booking_id}`;
         createNotification(heading, desc, 'Charging Service', 'RSA', 'Admin', '', rsa_id, href);
         // pushNotification(booking_data.fcm_token, heading, desc, 'RDRFCM', href);
         pushNotification(rsa.fcm_token, heading, desc, 'RSAFCM', href);
@@ -521,18 +540,18 @@ export const PodAssignBooking = async (req, resp) => {
             </body>
         </html>`;
         emailQueue.addEmail(rsa.email, 'PlusX Electric App: Booking Confirmation for Your EV Pick Up & Drop Off Service', htmlDriver);
-        
+
         // await commitTransaction(conn);
         return resp.json({
-            status  : 1, 
-            code    : 200,
-            message : "You have successfully assigned EV Pick Up & Drop Off booking." 
+            status: 1,
+            code: 200,
+            message: "You have successfully assigned EV Pick Up & Drop Off booking."
         });
 
-    } catch(err){
+    } catch (err) {
         // await rollbackTransaction(conn);
         console.error("Transaction failed:", err);
-        return resp.json({status: 0, code: 500, message: "Oops! There is something went wrong! Please Try Again" });
+        return resp.json({ status: 0, code: 500, message: "Oops! There is something went wrong! Please Try Again" });
     } finally {
         // if (conn) conn.release();
     }
@@ -541,9 +560,9 @@ export const PodAssignBooking = async (req, resp) => {
 /* Admin Cancel Booking */
 export const adminCancelCSBooking = asyncHandler(async (req, resp) => {
     const { rider_id, booking_id, reason } = mergeParam(req);
-    const { isValid, errors } = validateFields(mergeParam(req), {rider_id: ["required"], booking_id: ["required"], reason: ["required"] });
+    const { isValid, errors } = validateFields(mergeParam(req), { rider_id: ["required"], booking_id: ["required"], reason: ["required"] });
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
-    
+
     const checkOrder = await queryDB(`
         SELECT 
             name, rsa_id, slot_date_time,
@@ -557,7 +576,7 @@ export const adminCancelCSBooking = asyncHandler(async (req, resp) => {
         WHERE 
             request_id = ? AND rider_id = ? AND order_status IN ('CNF','A','ER') 
         LIMIT 1
-    `,[booking_id, rider_id]);
+    `, [booking_id, rider_id]);
 
     if (!checkOrder) {
         return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 404 });
@@ -567,25 +586,25 @@ export const adminCancelCSBooking = asyncHandler(async (req, resp) => {
         'INSERT INTO charging_service_history (service_id, rider_id, order_status, rsa_id, cancel_by, cancel_reason) VALUES (?, ?, "C", ?, "Admin", ?)',
         [booking_id, rider_id, checkOrder.rsa_id, reason]
     );
-    if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
+    if (insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
 
-    await updateRecord('charging_service', {order_status: 'C'}, ['request_id'], [booking_id]);
-    const href    = `charging_service/${booking_id}`;
-    const title   = 'EV Pick Up & Drop Off Cancel!';
+    await updateRecord('charging_service', { order_status: 'C' }, ['request_id'], [booking_id]);
+    const href = `charging_service/${booking_id}`;
+    const title = 'EV Pick Up & Drop Off Cancel!';
     const message = `We regret to inform you that your EV Pick Up & Drop Off booking (ID: ${booking_id}) has been cancelled by the admin.`;
     await createNotification(title, message, 'Charging Service', 'Rider', 'Rider', rider_id, rider_id, href);
     await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
-    if( checkOrder.rsa_id) {
+    if (checkOrder.rsa_id) {
         await db.execute(`DELETE FROM charging_service_assign WHERE rider_id=? AND order_id = ?`, [rider_id, booking_id]);
         await db.execute('UPDATE rsa SET running_order = running_order - 1 WHERE rsa_id = ?', [checkOrder.rsa_id]);
 
         const message1 = `A Booking of the EV Pick Up & Drop Off booking has been cancelled by admin with booking id : ${booking_id}`;
-        await createNotification(title, message1, 'Charging Service', 'RSA', 'Rider', rider_id, checkOrder.rsa_id,  href);
+        await createNotification(title, message1, 'Charging Service', 'RSA', 'Rider', rider_id, checkOrder.rsa_id, href);
         await pushNotification(checkOrder.rsa_fcm_token, title, message1, 'RSAFCM', href);
     }
     const slot_date_time = moment(checkOrder.slot_date_time).format('YYYY-MM-DD');
-    
+
     const html = `<html>
         <body>
             <h4>Dear ${checkOrder.user_name},</h4>
@@ -619,8 +638,8 @@ export const adminCancelCSBooking = asyncHandler(async (req, resp) => {
 
 export const failedBookingList = async (req, resp) => {
     try {
-        const { page_no, start_date, end_date, search_text  } = req.body;
-        const { isValid, errors } = validateFields(req.body, {page_no: ["required"]});
+        const { page_no, start_date, end_date, search_text } = req.body;
+        const { isValid, errors } = validateFields(req.body, { page_no: ["required"] });
         if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
 
         const params = {
@@ -630,26 +649,26 @@ export const failedBookingList = async (req, resp) => {
             sortOrder: 'DESC',
             page_no,
             limit: 10,
-            liveSearchFields : ['request_id', 'name'],
-            liveSearchTexts  : [search_text, search_text],
-            whereField       : [],
-            whereValue       : [],
-            whereOperator    : []
+            liveSearchFields: ['request_id', 'name'],
+            liveSearchTexts: [search_text, search_text],
+            whereField: [],
+            whereValue: [],
+            whereOperator: []
         };
 
         if (start_date && end_date) {
             const startToday = new Date(start_date);
             const startFormattedDate = `${startToday.getFullYear()}-${(startToday.getMonth() + 1).toString()
                 .padStart(2, '0')}-${startToday.getDate().toString().padStart(2, '0')}`;
-                        
-            const givenStartDateTime    = startFormattedDate+' 00:00:01'; // Replace with your datetime string
+
+            const givenStartDateTime = startFormattedDate + ' 00:00:01'; // Replace with your datetime string
             const modifiedStartDateTime = moment(givenStartDateTime).subtract(4, 'hours'); // Subtract 4 hours
-            const start        = modifiedStartDateTime.format('YYYY-MM-DD HH:mm:ss')
-            
+            const start = modifiedStartDateTime.format('YYYY-MM-DD HH:mm:ss')
+
             const endToday = new Date(end_date);
             const formattedEndDate = `${endToday.getFullYear()}-${(endToday.getMonth() + 1).toString()
                 .padStart(2, '0')}-${endToday.getDate().toString().padStart(2, '0')}`;
-            const end = formattedEndDate+' 19:59:59';
+            const end = formattedEndDate + ' 19:59:59';
 
             params.whereField = ['created_at', 'created_at'];
             params.whereValue = [start, end];
@@ -658,12 +677,12 @@ export const failedBookingList = async (req, resp) => {
         const result = await getPaginatedData(params);
 
         return resp.json({
-            status     : 1,
-            code       : 200,
-            message    : ["Failed Pick & Drop Booking List fetch successfully!"],
-            data       : result.data,
-            total_page : result.totalPage,
-            total      : result.total,
+            status: 1,
+            code: 200,
+            message: ["Failed Pick & Drop Booking List fetch successfully!"],
+            data: result.data,
+            total_page: result.totalPage,
+            total: result.total,
         });
     } catch (error) {
         console.error('Error fetching p & d booking list:', error);
@@ -676,7 +695,7 @@ export const failedbookingDetails = async (req, resp) => {
         const { request_id } = req.body;
 
         if (!request_id) {
-            return resp.json({ status : 0, code : 400, message : 'Booking ID is required.', });
+            return resp.json({ status: 0, code: 400, message: 'Booking ID is required.', });
         }
         const result = await db.execute(`SELECT 
                 cs.request_id, cs.name, cs.country_code, cs.contact_no, cs.order_status, cs.pickup_address, ROUND(cs.price/100, 2) AS price, 
@@ -687,23 +706,23 @@ export const failedbookingDetails = async (req, resp) => {
             FROM 
                 failed_charging_service cs
             WHERE 
-                cs.request_id = ?`, 
+                cs.request_id = ?`,
             [request_id]
         );
         if (result.length === 0) {
-            return resp.json({ status : 0, code : 404, message : 'Booking not found.', });
+            return resp.json({ status: 0, code: 404, message: 'Booking not found.', });
         }
         return resp.json({
-            status  : 1,
-            code    : 200,
-            message : ["Failed Pick & Drop booking details fetched successfully!"],
-            data    : result[0], 
+            status: 1,
+            code: 200,
+            message: ["Failed Pick & Drop booking details fetched successfully!"],
+            data: result[0],
         });
     } catch (error) {
-        return resp.json({ 
-            status  : 0, 
-            code    : 500, 
-            message : 'Error fetching booking details' 
+        return resp.json({
+            status: 0,
+            code: 500,
+            message: 'Error fetching booking details'
         });
     }
 };

@@ -65,7 +65,7 @@ export const getPaymentSessionData = async (req, resp) => {
 
 export const getPaymentdetails = async (req, resp) => {
     
-    const payment_intent_id = 'pi_3RLgyLKKO9oLX4Mk0pipgio8' ;
+    const payment_intent_id = 'pi_3RQo7zKKO9oLX4Mk0WBs44bw' ;
     // const email = 'omvir@plusxelectric.com' ;
     try {
         // const customers = await stripe.customers.list({ email });

@@ -209,13 +209,10 @@ export const truckFuelHhistory = async (req, resp) => {
                 .padStart(2, '0')}-${endToday.getDate().toString().padStart(2, '0')}`;
             const end = formattedEndDate+' 19:59:59';
 
-            console.log(start, end) //2025-05-13 20:00:01       2025-05-14 19:59:59
-
             params.whereField.push('created_at', 'created_at');
             params.whereValue.push(start, end);
             params.whereOperator.push('>=', '<=');
         }
-        console.log(params)
         const result = await getPaginatedData(params);
         return resp.json({
             status     : 1,

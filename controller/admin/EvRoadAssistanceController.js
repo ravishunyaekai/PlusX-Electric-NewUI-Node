@@ -7,11 +7,11 @@ import emailQueue from '../../emailQueue.js';
 
 /* RA Booking */
 export const bookingList = asyncHandler(async (req, resp) => {
-    const { start_date, end_date, search_text = '', status, page_no } = req.body;
+    const { start_date, end_date, search_text = '', status, page_no, rowSelected } = req.body;
 
-    const whereFields    = []
-    const whereValues    = []
-    const whereOperators = []
+    const whereFields    = ['order_status']
+    const whereValues    = ['PNR']
+    const whereOperators = ["!="]
 
     if (start_date && end_date) {
         
@@ -45,7 +45,7 @@ export const bookingList = asyncHandler(async (req, resp) => {
         sortColumn       : 'id',
         sortOrder        : 'DESC',
         page_no,
-        limit         : 10,
+        limit         : rowSelected || 10,
         whereField    : whereFields,
         whereValue    : whereValues,
         whereOperator : whereOperators
@@ -182,7 +182,7 @@ export const invoiceList = asyncHandler(async (req, resp) => {
     }
     const result = await getPaginatedData({
         tableName : 'road_assistance_invoice',
-        columns   : `invoice_id, amount, payment_status, invoice_date, currency, 
+        columns   : `invoice_id, payment_status, invoice_date, currency, ROUND(amount/100, 2) AS amount,
             (select concat(name, ",", country_code, "-", contact_no) from road_assistance as rs where rs.request_id = road_assistance_invoice.request_id limit 1)
             AS riderDetails`,
         sortColumn : 'id',
@@ -215,7 +215,8 @@ export const invoiceData = async (req, resp) => {
         SELECT 
             invoice_id, invoice_date, currency, 
             rs.name, rs.request_id, 
-            (SELECT coupan_percentage FROM coupon_usage WHERE booking_id = pci.request_id) AS discount
+            (SELECT coupan_percentage FROM coupon_usage WHERE booking_id = pci.request_id) AS discount,
+            (SELECT roadside_assistance_price FROM booking_price LIMIT 1) as booking_price
         FROM 
             road_assistance_invoice AS pci 
         LEFT JOIN 
@@ -233,15 +234,37 @@ export const invoiceData = async (req, resp) => {
     data.kw           = 25; //chargingLevelSum * 0.25;
     data.kw_dewa_amt  = data.kw * 0.44;
     data.kw_cpo_amt   = data.kw * 0.26;
-    data.delv_charge  = (90 - (data.kw_dewa_amt + data.kw_cpo_amt) ); //when start accepting payment
-    data.t_vat_amt    = ( (data.kw_dewa_amt + data.kw_cpo_amt  + data.delv_charge )  * 5) / 100 ;
-    data.price        = data.kw_dewa_amt + data.kw_cpo_amt + data.delv_charge + data.t_vat_amt;
+    data.delv_charge  = (parseFloat( data.booking_price) - (data.kw_dewa_amt + data.kw_cpo_amt) ); //when start accepting payment
+    // data.t_vat_amt    = ( (data.kw_dewa_amt + data.kw_cpo_amt  + data.delv_charge )  * 5) / 100 ;
+    // data.price        = data.kw_dewa_amt + data.kw_cpo_amt + data.delv_charge + data.t_vat_amt;
+    // data.dis_price    = 0;
+    // if(data.discount > 0){
+    //     const dis_price = ( data.price  * data.discount ) /100
+    //     data.dis_price  = dis_price;
+    //     data.price      = data.price - dis_price;
+    // } 
     data.dis_price    = 0;
     if(data.discount > 0){
-        const dis_price = ( data.price  * data.discount ) /100
-        data.dis_price  = dis_price;
-        data.price      = data.price - dis_price;
-    } 
+        if ( data.discount != parseFloat(100) ) {  
+            const dis_price = ( parseFloat( data.booking_price) * data.discount ) /100 ;
+            const total_amt = parseFloat( data.booking_price) - dis_price;  
+
+            data.dis_price  = dis_price ;
+            data.t_vat_amt  = Math.floor(( total_amt ) * 5) / 100; 
+            data.price      = total_amt + data.t_vat_amt;
+
+        } else {
+            data.t_vat_amt  = Math.floor(( parseFloat( data.booking_price) ) * 5) / 100;
+            const total_amt  = parseFloat( parseFloat( data.booking_price)) + parseFloat( data.t_vat_amt ); 
+
+            const dis_price = ( total_amt * data.discount)/100;
+            data.dis_price  = dis_price;
+            data.price      = total_amt - dis_price;
+        }
+    } else {
+        data.t_vat_amt = ( ( parseFloat( data.booking_price) )  * 5) / 100 ;
+        data.price     = parseFloat( data.booking_price) + data.t_vat_amt;
+    }
     return resp.json({
         message : ["Ev Roadside Assistance Invoice Details fetched successfully!"],
         data    : data,
@@ -327,7 +350,7 @@ export const failedRSABookingList = async (req, resp) => {
 
         const params = {
             tableName : 'failed_road_assistance',
-            columns   : `request_id, name, price, order_status, ${formatDateTimeInQuery(['created_at'])}`,
+            columns   : `request_id, name, ROUND(price/100, 2) AS price, order_status, ${formatDateTimeInQuery(['created_at'])}`,
             sortColumn : 'id',
             sortOrder  : 'DESC',
             page_no,
@@ -384,7 +407,7 @@ export const failedRSABookingDetails = async (req, resp) => {
         } 
         const [[bookingResult]] = await db.execute(`
             SELECT 
-                request_id, ${formatDateTimeInQuery(['created_at'])}, name, country_code, contact_no, order_status, pickup_address, pickup_latitude, pickup_longitude, parking_number, parking_floor, price,
+                request_id, ${formatDateTimeInQuery(['created_at'])}, name, country_code, contact_no, order_status, pickup_address, pickup_latitude, pickup_longitude, parking_number, parking_floor, ROUND(price/100, 2) AS price,
                 (select concat(vehicle_model, "-", vehicle_make) from riders_vehicles as rv where rv.vehicle_id = failed_road_assistance.vehicle_id) as vehicle_data
             FROM 
                 failed_road_assistance 
