@@ -292,11 +292,20 @@ export const chargerBookingDetails = async (req, resp) => {
             FROM 
                 portable_charger_history 
             WHERE 
-                booking_id = ?`, 
+                booking_id = ? order by id asc`, 
             [booking_id]
         );
         const bookingDetails = bookingResult[0];
-        const history        = bookingHistory
+        const history        = bookingHistory ;
+        const order_status = history.filter(item => item.order_status === 'CNF');
+        if(order_status.length > 1) {
+
+            const matchingIndexes = history.map((item, index) => item.order_status === 'CNF' ? index : -1)
+                .filter(index => index !== -1);
+
+            const lastValue                 = matchingIndexes[matchingIndexes.length - 1];
+            history[lastValue].order_status = 'RSB'
+        }
         bookingDetails.imageUrl = `${req.protocol}://${req.get('host')}/uploads/portable-charger/`;
         const feedBack = await queryDB(`
             SELECT 

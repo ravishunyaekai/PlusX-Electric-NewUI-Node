@@ -390,7 +390,7 @@ export const rsaBookingConfirm = async (session_id, payment_intent_id) => {
                     <p> Best regards,<br/> PlusX Electric App </p>
                 </body>
             </html>`;
-            emailQueue.addEmail(process.env.MAIL_ADMIN, `Roadside Assistance Booking Confirmation - PlusX Electric App`, htmlAdmin);
+            emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Roadside Assistance Booking Confirmation - PlusX Electric App`, htmlAdmin);
             
             // await commitTransaction(conn);
             return true;

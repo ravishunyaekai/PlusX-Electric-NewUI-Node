@@ -120,7 +120,7 @@ export const chargerBooking = asyncHandler(async (req, resp) => {
         const riderAddress = await queryDB(`
             SELECT 
                 landmark, (SELECT address_alert from portable_charger_booking where rider_id =? and address = ? order by id desc LIMIT 1) as address_alert,
-                (SELECT CONCAT(vehicle_make, "-", vehicle_model) FROM riders_vehicles where rider_id =? and vehicle_id = ? ) AS vehicle_data,
+                (SELECT CONCAT(vehicle_make, ", ", vehicle_model, ", ", vehicle_specification, ", ", emirates, "-", vehicle_code, "-", vehicle_number) FROM riders_vehicles where rider_id =? and vehicle_id = ? ) AS vehicle_data,
                 ( SELECT portable_price FROM booking_price LIMIT 1) as booking_price,
                 
             FROM 
@@ -293,10 +293,9 @@ export const chargerBookingDetail = asyncHandler(async (req, resp) => {
     const {rider_id, booking_id } = mergeParam(req);
     const { isValid, errors } = validateFields(mergeParam(req), {rider_id: ["required"], booking_id: ["required"]});
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
-    // 
     const booking = await queryDB(`
         SELECT 
-            portable_charger_booking.*, ROUND(portable_charger_booking.service_price / 100, 2) AS service_price, (select concat(vehicle_make, ", ", vehicle_model, ", ", vehicle_specification, ", ", emirates, "-", vehicle_code, "-", vehicle_number) from riders_vehicles as rv where rv.vehicle_id = portable_charger_booking.vehicle_id limit 1) as vehicle_data, 
+            booking_id, rescheduled_booking, rider_id, rsa_id, charger_id, vehicle_id, vehicle_data, service_name, service_type, service_feature, status, user_name, country_code, contact_no, slot, slot_date, slot_time, address, pod_id, parking_number, parking_floor, payment_intent_id, address_id, area, device_name, ROUND(portable_charger_booking.service_price / 100, 2) AS service_price, 
             ${formatDateTimeInQuery(['created_at', 'updated_at'])}, ${formatDateInQuery(['slot_date'])} 
         FROM 
             portable_charger_booking 
@@ -305,11 +304,24 @@ export const chargerBookingDetail = asyncHandler(async (req, resp) => {
         LIMIT 1`, 
     [rider_id, booking_id]);
 
-    if (booking && ( booking.status == 'PU' || booking.status == 'RO' ) ) {
+    if (booking && ( booking.status == 'CS' || booking.status == 'PU' || booking.status == 'RO' ) ) {
         const invoice_id = booking.booking_id.replace('PCB', 'INVPC');
         booking.invoice_url = `${req.protocol}://${req.get('host')}/public/portable-charger-invoice/${invoice_id}-invoice.pdf`;
     }
-    // const [history] = await db.execute(`SELECT * FROM portable_charger_history WHERE booking_id = ?`, [booking_id]);
+    if(booking.vehicle_data == '' || booking.vehicle_data == null) {
+        const vehicledata = await queryDB(`
+            SELECT                 
+                vehicle_make, vehicle_model, vehicle_specification, emirates, vehicle_code, vehicle_number
+            FROM 
+                riders_vehicles
+            WHERE 
+                rider_id = ? and vehicle_id = ? 
+            LIMIT 1 `,
+        [ rider_id, booking.vehicle_id ]);
+        if(vehicledata) {
+            booking.vehicle_data = vehicledata.vehicle_make + ", " + vehicledata.vehicle_model+ ", "+ vehicledata.vehicle_specification+ ", "+ vehicledata.emirates+ "-" + vehicledata.vehicle_code + "-"+ vehicledata.vehicle_number ;
+        }
+    }
     const [history] = await db.execute(`
         SELECT 
             order_status, cancel_by, cancel_reason as reason, rsa_id, ${formatDateTimeInQuery(['created_at'])}, image, remarks,   
@@ -317,9 +329,20 @@ export const chargerBookingDetail = asyncHandler(async (req, resp) => {
         FROM 
             portable_charger_history 
         WHERE 
-            booking_id = ?`, 
+            booking_id = ? order by id asc`, 
         [booking_id]
     );
+    // let seen = 0;
+    // const updated = history.map(e => e.order_status === "CNF" && ++seen === 2 ? { ...e, order_status: "RS" } : e);
+    const order_status = history.filter(item => item.order_status === 'CNF');
+    if(order_status.length > 1) {
+
+        const matchingIndexes = history.map((item, index) => item.order_status === 'CNF' ? index : -1)
+            .filter(index => index !== -1);
+
+        const lastValue                 = matchingIndexes[matchingIndexes.length - 1];
+        history[lastValue].order_status = 'RS'
+    }
     return resp.json({
         message         : ["POD Booking Details Service fetched successfully!"],
         data            : booking,
@@ -619,7 +642,7 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
             SELECT
                 pcb.user_name, pcb.country_code, pcb.contact_no, pcb.address, pcb.latitude, pcb.longitude,
                 pcb.rescheduled_booking, pcb.slot_date, pcb.slot_time, rd.fcm_token, rd.rider_email, 
-                (SELECT CONCAT(vehicle_make, "-", vehicle_model) FROM riders_vehicles as rv WHERE rv.vehicle_id = pcb.vehicle_id ) AS vehicle_data,
+                pcb.vehicle_data
             FROM 
                 portable_charger_booking as pcb
             LEFT JOIN
@@ -636,9 +659,11 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
         if (checkOrder.rescheduled_booking) {
             return resp.json({ message: [`This booking has already been rescheduled.`], status: 0, code: 404 });
         }
-        const oldSlotDateTime = moment(checkOrder.slot_date + ' ' + checkOrder.slot_time, 'YYYY-MM-DD HH:mm:ss').format('YYYY-MM-DD HH:mm:ss');
+        const oldSlotDateTime = moment(checkOrder.slot_date + ' ' + checkOrder.slot_time, 'YYYY-MM-DD HH:mm:ss'); 
+        //.format('YYYY-MM-DD HH:mm:ss');
         let prevDay  = oldSlotDateTime.subtract(24, 'hours').format('YYYY-MM-DD HH:mm:ss');
 
+        console.log(currDateTime,  prevDay) ;
         if (currDateTime > prevDay ) {
             return resp.json({
                 message: ["Apologies, rescheduling is only allowed up to 24 hours before the scheduled service time."],
@@ -708,9 +733,10 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
         });
 
     } catch(err) {
+        console.error("Transaction failed:", err);
         // await rollbackTransaction(conn);
         tryCatchErrorHandler(req.originalUrl, err, resp);
-        console.error("Transaction failed:", err);
+        
     } finally {
         // if (conn) conn.release();
     }
