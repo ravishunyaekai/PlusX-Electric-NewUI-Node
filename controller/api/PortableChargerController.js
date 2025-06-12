@@ -333,21 +333,26 @@ export const chargerBookingDetail = asyncHandler(async (req, resp) => {
             booking_id = ? order by id asc`, 
         [booking_id]
     );
-    // let seen = 0;
-    // const updated = history.map(e => e.order_status === "CNF" && ++seen === 2 ? { ...e, order_status: "RS" } : e);
-    const order_status = history.filter(item => item.order_status === 'CNF');
-    if(order_status.length > 1) {
+let seen = 0;
+// const updated = history.map(e => e.order_status === "CNF" && ++seen === 2 ? { ...e, order_status: "RS" } : e);
+let updated =history.map(item=>{ 
+    
+    item.order_status;
 
-        const matchingIndexes = history.map((item, index) => item.order_status === 'CNF' ? index : -1)
-            .filter(index => index !== -1);
-
-        const lastValue                 = matchingIndexes[matchingIndexes.length - 1];
-        history[lastValue].order_status = 'RS'
+    if(item.order_status==='CNF')
+    {seen++;
+        console.log(seen)
+    if(seen==2) return {...item, order_status:"RS"}
     }
+ return item });
+
+
+//  const updated = history.filter (  item=>{ if(item.order_status=="CNF"){ seen++;  if(seen===2){  return {...item, order_status:"RS"} } }    } )
+ console.log('updated',updated);
     return resp.json({
         message         : ["POD Booking Details Service fetched successfully!"],
         data            : booking,
-        service_history : history,
+        service_history : updated,
         status          : 1,
         code            : 200,
     });

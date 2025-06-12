@@ -482,7 +482,7 @@ export const vehicleBrandList = asyncHandler(async (req, resp) => {
 });
 
 
-export const dubaiAreaListOld = asyncHandler(async (req, resp) => {
+export const dubaiAreaList = asyncHandler(async (req, resp) => {
     const { area_name } = mergeParam(req);
 
     let query         = `SELECT area_name FROM dubai_area WHERE status = ?`;
