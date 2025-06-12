@@ -141,7 +141,7 @@ export const forgotPassword = asyncHandler(async (req, resp) => {
         return resp.status(200).json({ status: 1, code: 200, message: "Password Reset Request! We have sent the new password to your registered email." });
     } catch (error) {
         console.log(error)
-        tryCatchErrorHandler(error, resp );
+        tryCatchErrorHandler(req.originalUrl, error, resp );
         // resp.status(500).json({ status: 0, code: 500, message: "Failed to send email." });
     }
 });
@@ -389,7 +389,7 @@ export const updateProfile = asyncHandler(async (req, resp) => {
         return resp.json({status: 1, code: 200, message: ["Rider profile updated successfully"]});
     } catch(err) {
         console.log(err);
-        tryCatchErrorHandler(err, resp);
+        tryCatchErrorHandler(req.originalUrl, err, resp );
     }
 });
 
@@ -465,7 +465,7 @@ export const deleteAccount = asyncHandler(async (req, resp) => {
     } catch(err) {
         // await connection.rollback();
         console.error('Error deleting rider account:', err.message);
-        tryCatchErrorHandler(err, resp);
+        tryCatchErrorHandler(req.originalUrl, err, resp );
     } finally {
         // connection.release();
     }
@@ -551,7 +551,7 @@ export const riderAddressList = asyncHandler(async (req, resp) => {
         return resp.json({message: ['We apologize! Our services are currently unavailable in JLT'], status: 1, code: 200, data: result});
     }catch(err){
         console.error('Error fetching rider addresses:', err);
-        tryCatchErrorHandler(err, resp);
+        tryCatchErrorHandler(req.originalUrl, err, resp );
     }
 });
 
@@ -640,7 +640,7 @@ export const deleteRiderAddress = asyncHandler(async (req, resp) => {
         });
     }catch(err){
         // console.log('Error deleting record', err);
-        tryCatchErrorHandler(err, resp);
+        tryCatchErrorHandler(req.originalUrl, err, resp );
     }
 });
 
@@ -662,7 +662,7 @@ export const riderVehicleList = asyncHandler(async (req, resp) => {
         return resp.json({status: 1, code: 200, message: 'List fecth', data: result});
     } catch(err) {
         console.error('Error fetching rider vehicles:', err);
-        tryCatchErrorHandler(err, resp);
+        tryCatchErrorHandler(req.originalUrl, err, resp );
     }
 });
 

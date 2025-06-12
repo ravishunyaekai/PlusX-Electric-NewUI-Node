@@ -65,7 +65,8 @@ export const getPaymentSessionData = async (req, resp) => {
 
 export const getPaymentdetails = async (req, resp) => {
     
-    const payment_intent_id = 'pi_3RQo7zKKO9oLX4Mk0WBs44bw' ;
+    const payment_intent_id = 'pi_3RHIrqKKO9oLX4Mk0sK75JeA' ;
+    console.log(moment.unix('1745474328').format('YYYY-MM-DD HH:mm:ss') );
     // const email = 'omvir@plusxelectric.com' ;
     try {
         // const customers = await stripe.customers.list({ email });
@@ -80,7 +81,7 @@ export const getPaymentdetails = async (req, resp) => {
         // }
         const paymentIntent = await stripe.paymentIntents.retrieve(payment_intent_id);
         // const charge       = await stripe.charges.retrieve(paymentIntent.latest_charge);  //payment_method       
-        return resp.json({ paymentIntent });
+        return resp.json({ invoice_date : moment.unix('1745474328').format('YYYY-MM-DD HH:mm:ss'), paymentIntent });
     } catch (error) {
         return resp.json({ error : error.message });
     }
@@ -235,7 +236,7 @@ const portableChargerBookingConfirm = async (session_id, payment_intent_id ) => 
     } catch(err) {
         // await rollbackTransaction(conn);
         console.error("Transaction failed:", err);
-        tryCatchErrorHandler(err, []);
+        tryCatchErrorHandler('stripe-POD-confirm', err, []);
     } finally {
         // if (conn) conn.release();
         return true;
@@ -399,7 +400,7 @@ export const rsaBookingConfirm = async (session_id, payment_intent_id) => {
     } catch(err) {
         // await rollbackTransaction(conn);
         console.error("Transaction failed:", err);
-        tryCatchErrorHandler(err, []);
+        tryCatchErrorHandler('RSA-booking-cnf', err, []);
     } finally {
         // if (conn) conn.release();
         return true;
@@ -460,7 +461,7 @@ export const failedValetBooking = async () => {
     } catch (err) {
         // await conn.rollback();
         console.error("Transaction failed:", err);
-        tryCatchErrorHandler(err, []);
+        tryCatchErrorHandler('failed-valet-cron', err, []);
         return false;
     } finally {
         // conn.release();
@@ -494,7 +495,7 @@ export const failedRSABooking = async () => {
     } catch (err) {
         // await conn.rollback();
         console.error("Transaction failed:", err);
-        tryCatchErrorHandler(err, []);
+        tryCatchErrorHandler('failed-rsa-cron', err, []);
         return false;
     } finally {
         // conn.release();

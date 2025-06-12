@@ -3,13 +3,14 @@ import axios from "axios";
 import path from 'path';
 import puppeteer from 'puppeteer';
 import ejs from 'ejs';
-import { insertRecord } from "./dbUtils.js";
+import { insertRecord, queryDB } from "./dbUtils.js";
 import { GoogleAuth } from "google-auth-library";
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import db from "./config/db.js";
 dotenv.config();
+import moment from "moment-timezone";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -437,3 +438,59 @@ export const generatePdf = async (templatePath, invoiceData, fileName, savePdfDi
   }
 };
 
+export const checkCoupon = async (rider_id, booking_type, coupon_code) => {
+    
+    const [[{ count }]] = await db.execute('SELECT COUNT(*) AS count FROM coupon WHERE coupan_code = ?',[coupon_code]);
+    if (count === 0) return { status: 0, code: 422, message : 'The coupon you entered is not valid.' };
+
+    const coupon = await queryDB(`
+        SELECT
+            coupan_percentage, end_date, user_per_user, status, booking_for, 
+            (SELECT count(id) FROM coupon_usage AS cu WHERE cu.coupan_code = coupon.coupan_code AND user_id = ?) as use_count
+        FROM 
+            coupon
+        WHERE 
+            coupan_code = ?
+        LIMIT 1
+    `, [rider_id, coupon_code]); 
+
+    if (moment(coupon.end_date).isBefore(moment(), 'day') || coupon.status < 1){
+        return { status: 0, code: 422, message : "The coupon you entered has expired."} ;
+
+    } else if(coupon.booking_for != booking_type){
+        return { status: 0, code: 422, message : "The coupon code entered is not valid. Please check and try again."};
+
+    } else if(coupon.use_count >= coupon.user_per_user){
+        return { status: 0, code: 422, message : "This coupon code has already been used the maximum number of times."} ;
+    }
+    const priceQry  = `SELECT portable_price, pick_drop_price, roadside_assistance_price, portable_price, pick_drop_price FROM booking_price LIMIT 1`;
+    const priceData = await queryDB(priceQry, []);
+
+    const amount = (booking_type == 'Valet Charging') ? priceData.pick_drop_price : (booking_type == 'Roadside Assistance') ? priceData.roadside_assistance_price : priceData.portable_price ;
+    
+
+    const data = {}; 
+    if ( coupon.coupan_percentage != parseFloat(100) ) {
+        const dis_price = ( amount  * coupon.coupan_percentage ) /100;
+        const total_amt = amount - dis_price;
+        
+        const vat_amt  = Math.floor(( total_amt ) * 5) / 100;
+        data.total_amt = total_amt + vat_amt;
+
+    } else {
+        const vat_amt  = Math.floor(( amount ) * 5) / 100;
+        const total_amt = parseFloat(amount) + parseFloat( vat_amt ); 
+        const dis_price = ( total_amt * coupon.coupan_percentage)/100;
+        
+        data.total_amt  = total_amt - dis_price;
+    }
+    const finalAmount = data.total_amt;
+
+    return {
+        service_price : Math.floor( parseFloat(finalAmount) * 100 ), 
+        amount, 
+        message       : 'Your discount has been successfully applied. Enjoy the savings!',
+        status        : 1,
+        code          : 200
+    };
+};

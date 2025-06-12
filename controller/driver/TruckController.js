@@ -53,7 +53,7 @@ export const truckFuelAction = asyncHandler(async (req, resp) => {
 
     } catch(err) {
         console.log(err);
-        tryCatchErrorHandler(err, resp, 'Oops! There is something went wrong! while profile update');
+        tryCatchErrorHandler(req.originalUrl, err, resp, 'Oops! There is something went wrong! while profile update' );
     }
 });
 

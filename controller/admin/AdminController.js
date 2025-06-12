@@ -251,7 +251,7 @@ export const riderDetails = async (req, resp) => {
         );
         var [riderVehicles] = await db.execute(
             `SELECT 
-                vehicle_id, vehicle_type, vehicle_number, vehicle_code, vehicle_model, vehicle_make,  vehicle_specification, emirates
+                vehicle_id, vehicle_type, vehicle_number, vehicle_code, vehicle_model, vehicle_make, vehicle_specification, emirates
             FROM 
                 riders_vehicles
             WHERE 
@@ -260,7 +260,7 @@ export const riderDetails = async (req, resp) => {
         );
         const [chargerRows] = await db.execute(
             `SELECT 
-                pcb.booking_id, rsa.rsa_name, pcb.vehicle_id, pcb.service_name, pcb.service_price, pcb.service_type, pcb.status, 
+                pcb.booking_id, rsa.rsa_name, pcb.vehicle_id, pcb.service_name, ROUND(pcb.service_price/100, 2) AS service_price, pcb.service_type, pcb.status, 
                 ${formatDateTimeInQuery(['pcb.created_at'])}
             FROM 
                 portable_charger_booking pcb
@@ -273,10 +273,11 @@ export const riderDetails = async (req, resp) => {
             DESC
             LIMIT 5`,
             [riderId]
-        );
+        ); //pcb.service_price, 
         const [chargingServiceRows] = await db.execute(
             `SELECT 
-                cs.request_id, rsa.rsa_name, cs.vehicle_id, cs.price, cs.order_status, 
+                cs.request_id, rsa.rsa_name, cs.vehicle_id, cs.order_status,
+                ROUND(cs.price / 100, 2) AS price, 
                 ${formatDateTimeInQuery(['cs.created_at'])}
             FROM 
                 charging_service cs

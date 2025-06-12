@@ -152,7 +152,7 @@ export const sellVehicle = asyncHandler(async (req, resp) => {
         });    
     }catch(err){
         console.log(err);
-        tryCatchErrorHandler(err, resp);
+        tryCatchErrorHandler(req.originalUrl, err, resp );
     }
 });
 
@@ -298,7 +298,7 @@ export const updateSellVehicle = asyncHandler(async (req, resp) => {
         });
     }catch(err){
         console.log(err);
-        tryCatchErrorHandler(err, resp);
+        tryCatchErrorHandler(req.originalUrl, err, resp );
     }
 });
 
@@ -359,7 +359,7 @@ export const deleteSellVehicle = asyncHandler(async (req, resp) => {
 
     }catch(err){
         console.error('Error deleting sell vehicle account:', err);
-        tryCatchErrorHandler(err, resp);
+        tryCatchErrorHandler(req.originalUrl, err, resp);
     }
 
 });

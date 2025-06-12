@@ -153,7 +153,7 @@ export const requestService = asyncHandler(async (req, resp) => {
     }catch(err){
         // await rollbackTransaction(conn);
         console.error("Transaction failed:", err);
-        tryCatchErrorHandler(err, resp);
+        tryCatchErrorHandler(req.originalUrl, err, resp );
     } finally {
         // if (conn) conn.release();
     }
