@@ -448,43 +448,59 @@ export const userCancelPCBooking = asyncHandler(async (req, resp) => {
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
 
     const checkOrder = await queryDB(`
-        SELECT 
-            rsa_id, address, slot_time, user_name, 
-            DATE_FORMAT(slot_date, '%Y-%m-%d') AS slot_date,
-            concat( country_code, "-", contact_no) as contact_no, 
-            (SELECT rd.rider_email FROM riders AS rd WHERE rd.rider_id = pcb.rider_id) AS rider_email,
-            (SELECT rd.rider_name FROM riders AS rd WHERE rd.rider_id = pcb.rider_id) AS rider_name,
-            (select fcm_token from riders as r where r.rider_id = pcb.rider_id ) as fcm_token, 
-            (select fcm_token from rsa where rsa.rsa_id = pcb.rsa_id ) as rsa_fcm_token
-        FROM 
-            portable_charger_booking AS pcb
+        SELECT  
+            pcb.rsa_id, pcb.address, pcb.slot_time, pcb.user_name, DATE_FORMAT(pcb.slot_date, '%Y-%m-%d') AS slot_date, 
+            concat( pcb.country_code, "-", pcb.contact_no) as contact_no, riders.rider_email , riders.rider_name,riders.fcm_token, rsa.fcm_token as rsa_fcm_token
+        FROM  
+            portable_charger_booking pcb
+        LEFT JOIN  
+            riders on riders.rider_id=pcb.rider_id 
+        LEFT JOIN 
+            rsa ON  rsa.rsa_id = pcb.rsa_id 
         WHERE 
-            booking_id = ? AND rider_id = ? AND status IN ('CNF','A','ER') 
-        LIMIT 1
-    `,[booking_id, rider_id]);
+            pcb.booking_id =? AND pcb.rider_id = ? AND pcb.status IN ('CNF', 'A') 
+    `, [booking_id, rider_id]);
+
+    // const checkOrderOld = await queryDB(`
+    //     SELECT 
+    //         rsa_id, address, slot_time, user_name, 
+    //         DATE_FORMAT(slot_date, '%Y-%m-%d') AS slot_date,
+    //         concat( country_code, "-", contact_no) as contact_no, 
+    //         (SELECT rd.rider_email FROM riders AS rd WHERE rd.rider_id = pcb.rider_id) AS rider_email,
+    //         (SELECT rd.rider_name FROM riders AS rd WHERE rd.rider_id = pcb.rider_id) AS rider_name,
+    //         (select fcm_token from riders as r where r.rider_id = pcb.rider_id ) as fcm_token, 
+    //         (select fcm_token from rsa where rsa.rsa_id = pcb.rsa_id ) as rsa_fcm_token
+    //     FROM 
+    //         portable_charger_booking AS pcb
+    //     WHERE 
+    //         booking_id = ? AND rider_id = ? AND status IN ('CNF', 'A', 'ER') 
+    //     LIMIT 1
+    // `,[booking_id, rider_id]);
 
     if (!checkOrder) {
         return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 404 });
     }
     var slotDateTime = moment(`${checkOrder.slot_date} ${checkOrder.slot_time}`).format('YYYY-MM-DD HH:mm:ss');
     let dubaiTime    = new Date().toLocaleString("en-US", { timeZone: "Asia/Dubai" });
-    dubaiTime        = moment(dubaiTime).add(2, 'hours').format('YYYY-MM-DD HH:mm:ss');
+    // dubaiTime        = moment(dubaiTime).add(1, 'hours').format('YYYY-MM-DD HH:mm:ss');
 
-    // console.log(slotDateTime , dubaiTime)
-    if (slotDateTime <= dubaiTime) {
+    let cancellationDeadline = moment(slotDateTime).subtract(1, 'hours').format('YYYY-MM-DD HH:mm:ss');
+    if (dubaiTime > cancellationDeadline) {
+    // if (slotDateTime <= dubaiTime) {
         return resp.json({
             status  : 0,
             code    : 422,
-            message : ['Please note : Cancellations aren not allowed within 2 hours of the scheduled time.']
+            // message : ['Please note : Cancellations aren not allowed within 2 hours of the scheduled time.']
+            message: ['Please note: Cancellations aren`t allowed within 1 hours of the scheduled time.']
         });
     }
     const insert = await db.execute(
         'INSERT INTO portable_charger_history (booking_id, rider_id, order_status, rsa_id, cancel_by, cancel_reason) VALUES (?, ?, "C", ?, "User", ?)',
         [booking_id, rider_id, checkOrder.rsa_id, reason]
     );
-    if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
+    if (insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
 
-    await updateRecord('portable_charger_booking', {status : 'C'}, ['booking_id'], [booking_id]);
+    await updateRecord('portable_charger_booking', { status : 'C' }, ['booking_id'], [booking_id]);
 
     const href    = `portable_charger_booking/${booking_id}`;
     const title   = 'Portable Charger Cancel!';
@@ -493,7 +509,7 @@ export const userCancelPCBooking = asyncHandler(async (req, resp) => {
 
     if(checkOrder.rsa_id) {
         await db.execute(`DELETE FROM portable_charger_booking_assign WHERE order_id=? AND rider_id=?`, [booking_id, rider_id]);
-        // await db.execute('UPDATE rsa SET running_order = running_order - 1 WHERE rsa_id = ?', [checkOrder.rsa_id]);
+        pushNotification(checkOrder.rsa_fcm_token, title, message, 'RSAFCM', href); 
     }
     const html = `<html>
         <body>
@@ -517,6 +533,7 @@ export const userCancelPCBooking = asyncHandler(async (req, resp) => {
             User Contact    : ${checkOrder.contact_no}</br>
             Booking ID    : ${booking_id}</br>
             Scheduled Date and Time : ${checkOrder.slot_date} - ${checkOrder.slot_time}</br> 
+            ${reason ? `Cancellation Reason : ${reason}</br>` : ''}
             Location      : ${checkOrder.address}</br>
             <p>Thank you for your attention to this update.</p>
             <p>Best regards,<br/>PlusX Electric Team </p>
@@ -524,7 +541,8 @@ export const userCancelPCBooking = asyncHandler(async (req, resp) => {
     </html>`;
     emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Portable Charger Service Booking Cancellation ( :Booking ID : ${booking_id} )`, adminHtml); 
 
-    return resp.json({ message: ['Your booking has been successfully canceled. Would you like to reschedule it now?'], status: 1, code: 200 });
+    // return resp.json({ message: ['Your booking has been successfully canceled. Would you like to reschedule it now?'], status: 1, code: 200 });
+    return resp.json({ message: ['Your booking has been successfully cancelled.'], status: 1, code: 200 });
 });
 
 export const userFeedbackPCBooking = asyncHandler(async (req, resp) => {
