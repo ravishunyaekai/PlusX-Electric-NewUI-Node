@@ -265,13 +265,13 @@ export const chargerBookingList = asyncHandler(async (req, resp) => {
     const total       = totalRows[0].total;
     const totalPage   = Math.max(Math.ceil(total / limit), 1);
 
-    const bookingsQuery = `SELECT booking_id, service_name, ROUND(portable_charger_booking.service_price/100, 2) AS service_price, service_type, user_name, country_code, contact_no, slot_time, status, 
+    const bookingsQuery = `SELECT rescheduled_booking, booking_id, service_name, ROUND(portable_charger_booking.service_price/100, 2) AS service_price, service_type, user_name, country_code, contact_no, slot_time, status, 
         ${formatDateTimeInQuery(['created_at'])}, ${formatDateInQuery(['slot_date'])}
         FROM portable_charger_booking WHERE rider_id = ? AND ${statusCondition} ${orderBy} LIMIT ${parseInt(start)}, ${parseInt(limit)}
     `;
     const [bookingList] = await db.execute(bookingsQuery, [rider_id, ...statusParams]);
 
-    const inProcessQuery = `SELECT booking_id, service_name, ROUND(portable_charger_booking.service_price/100, 2) AS service_price, service_type, user_name, country_code, contact_no, slot_time, status, 
+    const inProcessQuery = `SELECT rescheduled_booking, booking_id, service_name, ROUND(portable_charger_booking.service_price/100, 2) AS service_price, service_type, user_name, country_code, contact_no, slot_time, status, 
         ${formatDateTimeInQuery(['created_at'])}, ${formatDateInQuery(['slot_date'])}
         FROM portable_charger_booking WHERE rider_id = ? AND status NOT IN (?, ?, ?, ?, ?) ${orderBy} LIMIT ${parseInt(start)}, ${parseInt(limit)}
     `;
@@ -286,6 +286,7 @@ export const chargerBookingList = asyncHandler(async (req, resp) => {
         status     : 1,
         code       : 200,
         base_url   : `${req.protocol}://${req.get('host')}/uploads/portable-charger/`,
+        noResultMsg : 'There are no recent bookings. Please schedule your booking now.'
     });
 });
 
@@ -481,7 +482,7 @@ export const userCancelPCBooking = asyncHandler(async (req, resp) => {
         return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 404 });
     }
     var slotDateTime = moment(`${checkOrder.slot_date} ${checkOrder.slot_time}`).format('YYYY-MM-DD HH:mm:ss');
-    let dubaiTime    = new Date().toLocaleString("en-US", { timeZone: "Asia/Dubai" });
+    let dubaiTime    = new Date().toLocaleString("en-US", { timeZone: "Asia/Dubai" }).format('YYYY-MM-DD HH:mm:ss');
     // dubaiTime        = moment(dubaiTime).add(1, 'hours').format('YYYY-MM-DD HH:mm:ss');
 
     let cancellationDeadline = moment(slotDateTime).subtract(1, 'hours').format('YYYY-MM-DD HH:mm:ss');
@@ -681,7 +682,7 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
         //.format('YYYY-MM-DD HH:mm:ss');
         let prevDay  = oldSlotDateTime.subtract(24, 'hours').format('YYYY-MM-DD HH:mm:ss');
 
-        console.log(currDateTime,  prevDay) ;
+        // console.log(currDateTime,  prevDay) ;
         if (currDateTime > prevDay ) {
             return resp.json({
                 message: ["Apologies, rescheduling is only allowed up to 24 hours before the scheduled service time."],

@@ -380,7 +380,7 @@ export const rsaBookingConfirm = async (session_id, payment_intent_id) => {
             const htmlAdmin = `<html>
                 <body>
                     <h4>Dear Admin,</h4>
-                    <p>We have received a new booking for our Road Side Assistance. Below are the details:</p> 
+                    <p>We have received a new booking for the EV Roadside Assistance service. Please find the details below:</p>
                     <p>Customer Name  : ${checkOrder.name}</p>
                     Contact No.       : ${checkOrder.country_code}-${checkOrder.contact_no}<br>
                     <p>Pickup Address : ${checkOrder.pickup_address}</p>

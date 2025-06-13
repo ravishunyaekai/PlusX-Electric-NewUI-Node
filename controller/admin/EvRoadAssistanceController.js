@@ -231,7 +231,7 @@ export const invoiceData = async (req, resp) => {
     // );
     // const chargingLevelSum = chargingLevels[0].reduce((sum, startLevel, index) => sum + (startLevel - chargingLevels[1][index]), 0);
     
-    data.kw           = 25; //chargingLevelSum * 0.25;
+    data.kw           = 7; //chargingLevelSum * 0.25;
     data.kw_dewa_amt  = data.kw * 0.44;
     data.kw_cpo_amt   = data.kw * 0.26;
     data.delv_charge  = (parseFloat( data.booking_price) - (data.kw_dewa_amt + data.kw_cpo_amt) ); //when start accepting payment
