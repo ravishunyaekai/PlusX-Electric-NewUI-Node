@@ -293,15 +293,19 @@ export const rsaBookingHistory = asyncHandler(async (req, resp) => {
     let result = {};
     
     if(booking_type != 'R'){
+        console.log('idhar');
         const [valetCompleted] = await db.execute(`
             SELECT
                 request_id, pickup_address, pickup_latitude, pickup_longitude, order_status, parking_number, parking_floor, 
                 CONCAT(name, ",", country_code, "-", contact_no) as riderDetails, 
                 DATE_FORMAT(slot_date_time, '%Y-%m-%d %H:%i:%s') AS slot_date_time,
                 ${formatDateTimeInQuery(['created_at', 'updated_at'])} 
-            FROM charging_service
-            WHERE rsa_id = ? AND order_status = 'WC'
-            ORDER BY slot_date_time DESC
+            FROM 
+                charging_service
+            WHERE 
+                rsa_id = ? AND order_status = 'WC'
+            ORDER BY 
+                slot_date_time DESC
         `, [rsa_id]);
         
         const [podCompleted] = await db.execute(`
@@ -314,7 +318,9 @@ export const rsaBookingHistory = asyncHandler(async (req, resp) => {
             FROM 
                 portable_charger_booking AS pcb
             LEFT JOIN 
-                portable_charger_history AS pch ON pcb.booking_id = pch.booking_id AND pch.order_status = pcb.status
+                portable_charger_history AS pch 
+                ON CONVERT(pcb.booking_id USING utf8mb4) COLLATE utf8mb4_unicode_ci = 
+                CONVERT(pch.booking_id USING utf8mb4) COLLATE utf8mb4_unicode_ci 
             LEFT JOIN
                 riders_vehicles AS rv ON pcb.vehicle_id = rv.vehicle_id
             WHERE 
@@ -335,7 +341,8 @@ export const rsaBookingHistory = asyncHandler(async (req, resp) => {
         
         result.valet_completed = valetCompleted;
         result.pod_completed = podCompletedWithImages;
-    }else{
+    } else {
+        console.log('Udhar');
         const [valetRejected] = await db.execute(`
             SELECT 
                 cs.request_id, cs.pickup_address, cs.pickup_latitude, cs.pickup_longitude, cs.order_status, cs.parking_number, cs.parking_floor, 
@@ -379,9 +386,12 @@ export const rsaBookingHistory = asyncHandler(async (req, resp) => {
                 CONCAT(name, ",", country_code, "-", contact_no) as riderDetails, 
                 DATE_FORMAT(slot_date_time, '%Y-%m-%d %H:%i:%s') AS slot_date_time, 
                 ${formatDateTimeInQuery(['created_at', 'updated_at',])} 
-            FROM charging_service
-            WHERE rsa_id = ? AND order_status = 'C'
-            ORDER BY slot_date_time DESC
+            FROM 
+                charging_service
+            WHERE 
+                rsa_id = ? AND order_status = 'C'
+            ORDER BY 
+                slot_date_time DESC
         `, [rsa_id]);
 
         const [podCancelled] = await db.execute(`
@@ -396,10 +406,10 @@ export const rsaBookingHistory = asyncHandler(async (req, resp) => {
             ORDER BY slot_date_time DESC
         `, [rsa_id]);
 
-        result.valet_rejected = valetRejected;
-        result.pod_rejected = podRejected;
+        result.valet_rejected  = valetRejected;
+        result.pod_rejected    = podRejected;
         result.valet_cancelled = valetCancelled;
-        result.pod_cancelled = podCancelled;
+        result.pod_cancelled   = podCancelled;
     }
     return resp.json({
         messag : [ "RSA Booking Completed/ Rejected History" ], 

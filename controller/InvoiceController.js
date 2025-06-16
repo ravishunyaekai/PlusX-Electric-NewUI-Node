@@ -198,12 +198,12 @@ export const portableChargerInvoice = asyncHandler(async (req, resp) => {
             const htmlAdmin = `<html>
                 <body>
                     <h4>Dear Admin,</h4>
-                    <p>We have received a new booking for our Portable Charger service. Below are the details:</p> 
+                    <p>We have received a new booking for our Portable Charger service. Please find the details below:</p>  
                     Customer Name : ${checkOrder.user_name}<br>
                     Contact No.   : ${checkOrder.country_code}-${checkOrder.contact_no}<br>
                     Address       : ${checkOrder.address}<br>
                     Booking Time  : ${dubaiTime}<br>                    
-                    Schedule Time : ${moment(checkOrder.slot_date, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(checkOrder.slot_time, 'HH:mm').format('h:mm A')}<br>       
+                    Service Date & Time : ${moment(checkOrder.slot_date, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(checkOrder.slot_time, 'HH:mm').format('h:mm A')}<br>       
                     Vechile Details : ${checkOrder.vehicle_data}<br> 
                     <a href="https://www.google.com/maps?q=${checkOrder.latitude},${checkOrder.longitude}">Address Link</a><br>
                     <p> Best regards,<br/>PlusX Electric Team </p>
@@ -308,14 +308,16 @@ export const rsaInvoice = asyncHandler(async (req, resp) => {
                 <body>
                     <h4>Dear Admin,</h4>
                     <p>We have received a new booking for the EV Roadside Assistance service. Please find the details below:</p>
-                    <p>Customer Name   : ${checkOrder.name}</p>
-                    <p>Contact No.: ${checkOrder.country_code}-${checkOrder.contact_no}</p>
+                    <P>Please find the details below:</p>
+                    <p>Customer Name  : ${checkOrder.name}</p>
+                    <p>Contact Number : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
                     <p>Address         : ${checkOrder.pickup_address}</p>
                     <p>Vechile Details   : ${checkOrder.vehicle_data}</p>
                     <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a><br>           
                     <p> Best regards,<br/> PlusX Electric App </p>
                 </body>
             </html>`;
+            
             emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `EV Roadside Assistance Booking - ${request_id}`, htmlAdmin);
             
             // await commitTransaction(conn);

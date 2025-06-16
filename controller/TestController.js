@@ -366,21 +366,25 @@ export const rsaBookingConfirm = async (session_id, payment_intent_id) => {
         
             let dubaiTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Dubai" });
             dubaiTime     = moment(dubaiTime).format('D MMM, YYYY, h:mm A');
+            
             const htmlUser = `<html>
                 <body>
                     <h4>Dear ${checkOrder.name},</h4>
-                    <p>Thank you for using the PlusX Electric App for your roadside assistance needs. We have successfully received your booking request. Below are the details of your roadside assistance booking:</p> 
-                    <p>Booking Reference: ${checkOrder.request_id}</p>
+                    <p>Thank you for choosing our Roadside Assistance service for your EV. We are pleased to confirm that your booking has been successfully received.</p> 
+                    <p>Booking Details: </p>
+                    <p>Booking ID: ${checkOrder.request_id}</p>
                     <p>Date & Time of Request: ${dubaiTime}</p> 
-                    <p>Location: ${checkOrder.pickup_address}</p>                         
-                    <p> Regards,<br/> PlusX Electric App </p>
+                    <p>Address: ${checkOrder.pickup_address}</p>  
+                    <p>We look forward to serving you and providing a seamless EV charging experience.</p>                       
+                    <p> Best regards,<br/> PlusX Electric Team </p>
                 </body>
             </html>`;
-            emailQueue.addEmail(checkOrder.rider_email, 'Your Roadside Assistance Booking Confirmation - PlusX Electric App', htmlUser);
+            emailQueue.addEmail(checkOrder.rider_email, 'PlusX Electric App: Booking Confirmation for EV Roadside Assistance Service', htmlUser);
+
             const htmlAdmin = `<html>
                 <body>
                     <h4>Dear Admin,</h4>
-                    <p>We have received a new booking for the EV Roadside Assistance service. Please find the details below:</p>
+                    <p>We have received a new booking for the EV Roadside Assistance service. Please find the details below:</p> 
                     <p>Customer Name  : ${checkOrder.name}</p>
                     Contact No.       : ${checkOrder.country_code}-${checkOrder.contact_no}<br>
                     <p>Pickup Address : ${checkOrder.pickup_address}</p>
@@ -390,8 +394,8 @@ export const rsaBookingConfirm = async (session_id, payment_intent_id) => {
                     <p> Best regards,<br/> PlusX Electric App </p>
                 </body>
             </html>`;
-            emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Roadside Assistance Booking Confirmation - PlusX Electric App`, htmlAdmin);
-            
+            emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `EV Roadside Assistance Booking-${checkOrder.request_id}  `, htmlAdmin);
+           
             // await commitTransaction(conn);
             return true;
         } else {

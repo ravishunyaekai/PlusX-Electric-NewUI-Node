@@ -304,7 +304,7 @@ export const home = asyncHandler(async (req, resp) => {
     
     const podBookingData = await queryDB(
         `SELECT booking_id AS request_id, (SELECT CONCAT(rsa_name, ',', country_code, ' ', mobile) FROM rsa WHERE rsa_id = portable_charger_booking.rsa_id) AS rsaDetails, created_at 
-        FROM portable_charger_booking WHERE rider_id = ? AND status NOT IN ('PNR', 'CNF', 'A', 'PU', 'C', 'RO') ORDER BY id DESC LIMIT 1
+        FROM portable_charger_booking WHERE rider_id = ? AND status NOT IN ('PNR', 'CNF', 'A', 'PU', 'C', 'RO', 'CC') ORDER BY id DESC LIMIT 1
     `, [rider_id]);
     //  created_at >= NOW() - INTERVAL 30 MINUTE
 
