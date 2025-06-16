@@ -198,6 +198,7 @@ export const listServices = asyncHandler(async (req, resp) => {
         total,
         status : 1,
         code   : 200,
+        noResultMsg : 'There are no recent bookings. Please schedule your booking now.'
     });
 });
 
