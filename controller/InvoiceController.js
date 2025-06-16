@@ -300,7 +300,7 @@ export const rsaInvoice = asyncHandler(async (req, resp) => {
                     <p>Booking ID: ${request_id}</p>
                     <p>Address: ${checkOrder.pickup_address}</p>    
                     <p>We look forward to serving you and providing a seamless EV charging experience.</p>
-                    <p> Regards,<br/> PlusX Electric App </p>
+                    <p>Best regards,<br/> PlusX Electric Team </p>
                 </body>
             </html>`;
             emailQueue.addEmail(checkOrder.rider_email, 'PlusX Electric App: Booking Confirmation for EV Roadside Assistance Service', htmlUser);
@@ -309,12 +309,12 @@ export const rsaInvoice = asyncHandler(async (req, resp) => {
                     <h4>Dear Admin,</h4>
                     <p>We have received a new booking for the EV Roadside Assistance service. Please find the details below:</p>
                     <P>Please find the details below:</p>
-                    <p>Customer Name  : ${checkOrder.name}</p>
-                    <p>Contact Number : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
-                    <p>Address         : ${checkOrder.pickup_address}</p>
-                    <p>Vechile Details   : ${checkOrder.vehicle_data}</p>
+                    <p>Customer Name   : ${checkOrder.name}</p>
+                    <p>Contact Number  : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
+                    <p>Pickup Address  : ${checkOrder.pickup_address}</p>
+                    <p>Vechile Details : ${checkOrder.vehicle_data}</p>
                     <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a><br>           
-                    <p> Best regards,<br/> PlusX Electric App </p>
+                    <p>Best regards,<br/> PlusX Electric Team </p>
                 </body>
             </html>`;
             
