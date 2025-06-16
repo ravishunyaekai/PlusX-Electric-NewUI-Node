@@ -120,8 +120,8 @@ export const chargerBooking = asyncHandler(async (req, resp) => {
         const riderAddress = await queryDB(`
             SELECT 
                 landmark, (SELECT address_alert from portable_charger_booking where rider_id =? and address = ? order by id desc LIMIT 1) as address_alert,
-                (SELECT CONCAT(vehicle_make, "-", vehicle_model) FROM riders_vehicles where rider_id =? and vehicle_id = ? ) AS vehicle_data,
-                ( SELECT portable_price FROM booking_price LIMIT 1) as booking_price,
+                (SELECT CONCAT(vehicle_make, ", ", vehicle_model, ", ", vehicle_specification, ", ", emirates, "-", vehicle_code, "-", vehicle_number) FROM riders_vehicles where rider_id =? and vehicle_id = ? ) AS vehicle_data,
+                ( SELECT portable_price FROM booking_price LIMIT 1) as booking_price
                 
             FROM 
                 rider_address
@@ -290,13 +290,13 @@ export const chargerBookingList = asyncHandler(async (req, resp) => {
 });
 
 export const chargerBookingDetail = asyncHandler(async (req, resp) => {
+       
     const {rider_id, booking_id } = mergeParam(req);
     const { isValid, errors } = validateFields(mergeParam(req), {rider_id: ["required"], booking_id: ["required"]});
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
-    // 
     const booking = await queryDB(`
         SELECT 
-            portable_charger_booking.*, ROUND(portable_charger_booking.service_price / 100, 2) AS service_price, (select concat(vehicle_make, ", ", vehicle_model, ", ", vehicle_specification, ", ", emirates, "-", vehicle_code, "-", vehicle_number) from riders_vehicles as rv where rv.vehicle_id = portable_charger_booking.vehicle_id limit 1) as vehicle_data, 
+            booking_id, rescheduled_booking, rider_id, rsa_id, charger_id, vehicle_id, vehicle_data, service_name, service_type, service_feature, status, user_name, country_code, contact_no, slot, slot_date, slot_time, address, pod_id, parking_number, parking_floor, payment_intent_id, address_id, area, device_name, ROUND(portable_charger_booking.service_price / 100, 2) AS service_price, 
             ${formatDateTimeInQuery(['created_at', 'updated_at'])}, ${formatDateInQuery(['slot_date'])} 
         FROM 
             portable_charger_booking 
@@ -305,11 +305,24 @@ export const chargerBookingDetail = asyncHandler(async (req, resp) => {
         LIMIT 1`, 
     [rider_id, booking_id]);
 
-    if (booking && ( booking.status == 'PU' || booking.status == 'RO' ) ) {
+    if (booking && ( booking.status == 'CS' || booking.status == 'PU' || booking.status == 'RO' ) ) {
         const invoice_id = booking.booking_id.replace('PCB', 'INVPC');
         booking.invoice_url = `${req.protocol}://${req.get('host')}/public/portable-charger-invoice/${invoice_id}-invoice.pdf`;
     }
-    // const [history] = await db.execute(`SELECT * FROM portable_charger_history WHERE booking_id = ?`, [booking_id]);
+    if(booking.vehicle_data == '' || booking.vehicle_data == null) {
+        const vehicledata = await queryDB(`
+            SELECT                 
+                vehicle_make, vehicle_model, vehicle_specification, emirates, vehicle_code, vehicle_number
+            FROM 
+                riders_vehicles
+            WHERE 
+                rider_id = ? and vehicle_id = ? 
+            LIMIT 1 `,
+        [ rider_id, booking.vehicle_id ]);
+        if(vehicledata) {
+            booking.vehicle_data = vehicledata.vehicle_make + ", " + vehicledata.vehicle_model+ ", "+ vehicledata.vehicle_specification+ ", "+ vehicledata.emirates+ "-" + vehicledata.vehicle_code + "-"+ vehicledata.vehicle_number ;
+        }
+    }
     const [history] = await db.execute(`
         SELECT 
             order_status, cancel_by, cancel_reason as reason, rsa_id, ${formatDateTimeInQuery(['created_at'])}, image, remarks,   
@@ -317,29 +330,28 @@ export const chargerBookingDetail = asyncHandler(async (req, resp) => {
         FROM 
             portable_charger_history 
         WHERE 
-            booking_id = ?`, 
+            booking_id = ? order by id asc`, 
         [booking_id]
     );
-let seen = 0;
-// const updated = history.map(e => e.order_status === "CNF" && ++seen === 2 ? { ...e, order_status: "RS" } : e);
-let updated =history.map(item=>{ 
-    
-    item.order_status;
 
-    if(item.order_status==='CNF')
-    {seen++;
-        console.log(seen)
-    if(seen==2) return {...item, order_status:"RS"}
+    // let seen = 0;
+    // const updated = history.map(e => e.order_status === "CNF" && ++seen === 2 ? { ...e, order_status: "RS" } : e);
+
+
+    const order_status = history.filter(item => item.order_status === 'CNF');
+    if(order_status.length > 1) {
+
+        const matchingIndexes = history.map((item, index) => item.order_status === 'CNF' ? index : -1)
+            .filter(index => index !== -1);
+
+        const lastValue                 = matchingIndexes[matchingIndexes.length - 1];
+        history[lastValue].order_status = 'RS'
     }
- return item });
 
-
-//  const updated = history.filter (  item=>{ if(item.order_status=="CNF"){ seen++;  if(seen===2){  return {...item, order_status:"RS"} } }    } )
- console.log('updated',updated);
     return resp.json({
         message         : ["POD Booking Details Service fetched successfully!"],
         data            : booking,
-        service_history : updated,
+        service_history : history,
         status          : 1,
         code            : 200,
     });
@@ -441,43 +453,61 @@ export const userCancelPCBooking = asyncHandler(async (req, resp) => {
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
 
     const checkOrder = await queryDB(`
-        SELECT 
-            rsa_id, address, slot_time, user_name, 
-            DATE_FORMAT(slot_date, '%Y-%m-%d') AS slot_date,
-            concat( country_code, "-", contact_no) as contact_no, 
-            (SELECT rd.rider_email FROM riders AS rd WHERE rd.rider_id = pcb.rider_id) AS rider_email,
-            (SELECT rd.rider_name FROM riders AS rd WHERE rd.rider_id = pcb.rider_id) AS rider_name,
-            (select fcm_token from riders as r where r.rider_id = pcb.rider_id ) as fcm_token, 
-            (select fcm_token from rsa where rsa.rsa_id = pcb.rsa_id ) as rsa_fcm_token
-        FROM 
-            portable_charger_booking AS pcb
+        SELECT  
+            pcb.rsa_id, pcb.address, pcb.slot_time, pcb.user_name, DATE_FORMAT(pcb.slot_date, '%Y-%m-%d') AS slot_date, 
+            concat( pcb.country_code, "-", pcb.contact_no) as contact_no, riders.rider_email , riders.rider_name,riders.fcm_token, rsa.fcm_token as rsa_fcm_token
+        FROM  
+            portable_charger_booking pcb
+        LEFT JOIN  
+            riders on riders.rider_id=pcb.rider_id 
+        LEFT JOIN 
+            rsa ON  rsa.rsa_id = pcb.rsa_id 
         WHERE 
-            booking_id = ? AND rider_id = ? AND status IN ('CNF','A','ER') 
-        LIMIT 1
-    `,[booking_id, rider_id]);
+            pcb.booking_id =? AND pcb.rider_id = ? AND pcb.status IN ('CNF', 'A') 
+    `, [booking_id, rider_id]);
+
+    // const checkOrderOld = await queryDB(`
+    //     SELECT 
+    //         rsa_id, address, slot_time, user_name, 
+    //         DATE_FORMAT(slot_date, '%Y-%m-%d') AS slot_date,
+    //         concat( country_code, "-", contact_no) as contact_no, 
+    //         (SELECT rd.rider_email FROM riders AS rd WHERE rd.rider_id = pcb.rider_id) AS rider_email,
+    //         (SELECT rd.rider_name FROM riders AS rd WHERE rd.rider_id = pcb.rider_id) AS rider_name,
+    //         (select fcm_token from riders as r where r.rider_id = pcb.rider_id ) as fcm_token, 
+    //         (select fcm_token from rsa where rsa.rsa_id = pcb.rsa_id ) as rsa_fcm_token
+    //     FROM 
+    //         portable_charger_booking AS pcb
+    //     WHERE 
+    //         booking_id = ? AND rider_id = ? AND status IN ('CNF', 'A', 'ER') 
+    //     LIMIT 1
+    // `,[booking_id, rider_id]);
 
     if (!checkOrder) {
         return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 404 });
     }
-    var slotDateTime = moment(`${checkOrder.slot_date} ${checkOrder.slot_time}`).format('YYYY-MM-DD HH:mm:ss');
-    let dubaiTime    = new Date().toLocaleString("en-US", { timeZone: "Asia/Dubai" });
-    dubaiTime        = moment(dubaiTime).add(2, 'hours').format('YYYY-MM-DD HH:mm:ss');
-
-    // console.log(slotDateTime , dubaiTime)
-    if (slotDateTime <= dubaiTime) {
+    let slotDateTime = moment(`${checkOrder.slot_date} ${checkOrder.slot_time}`).format('YYYY-MM-DD HH:mm:ss');
+    //  let dubaiTime    = new Date().toLocaleString("en-US", { timeZone: "Asia/Dubai" }).format('YYYY-MM-DD HH:mm:ss');
+    // console.log("olddubaiTime",olddubaiTime);
+     // dubaiTime        = moment(dubaiTime).add(1, 'hours').format('YYYY-MM-DD HH:mm:ss');
+let dubaiTime = moment.tz("Asia/Dubai").format('YYYY-MM-DD HH:mm:ss');
+    // console.log("dubaiTime",dubaiTime);
+let cancellationDeadline = moment(slotDateTime).subtract(1, 'hours').format('YYYY-MM-DD HH:mm:ss');
+    if (dubaiTime > cancellationDeadline) {
+    // if (slotDateTime <= dubaiTime) {
         return resp.json({
             status  : 0,
             code    : 422,
-            message : ['Please note : Cancellations aren not allowed within 2 hours of the scheduled time.']
+            // message : ['Please note : Cancellations aren not allowed within 2 hours of the scheduled time.']
+            message: ['Please note: Cancellations aren`t allowed within 1 hours of the scheduled time.']
         });
     }
     const insert = await db.execute(
         'INSERT INTO portable_charger_history (booking_id, rider_id, order_status, rsa_id, cancel_by, cancel_reason) VALUES (?, ?, "C", ?, "User", ?)',
         [booking_id, rider_id, checkOrder.rsa_id, reason]
     );
-    if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
+    if (insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
 
-    await updateRecord('portable_charger_booking', {status : 'C'}, ['booking_id'], [booking_id]);
+    await updateRecord('portable_charger_booking', { status : 'C' }, ['booking_id'], [booking_id]);
 
     const href    = `portable_charger_booking/${booking_id}`;
     const title   = 'Portable Charger Cancel!';
@@ -486,7 +516,7 @@ export const userCancelPCBooking = asyncHandler(async (req, resp) => {
 
     if(checkOrder.rsa_id) {
         await db.execute(`DELETE FROM portable_charger_booking_assign WHERE order_id=? AND rider_id=?`, [booking_id, rider_id]);
-        // await db.execute('UPDATE rsa SET running_order = running_order - 1 WHERE rsa_id = ?', [checkOrder.rsa_id]);
+        pushNotification(checkOrder.rsa_fcm_token, title, message, 'RSAFCM', href); 
     }
     const html = `<html>
         <body>
@@ -504,20 +534,25 @@ export const userCancelPCBooking = asyncHandler(async (req, resp) => {
     const adminHtml = `<html>
         <body>
             <h4>Dear Admin,</h4>
-            <p>This is to inform you that a user has cancelled their booking for the Portable EV Charging Service. Please see the details below for record-keeping and any necessary follow-up.</p>
+            <p>This is to inform you that a user has cancelled their booking for the Portable EV Charging Service.</p>
+            <p>Please find the details below:</p>
             <p>Booking Details:</p>
-            User Name    : ${checkOrder.user_name}</br>
-            User Contact    : ${checkOrder.contact_no}</br>
             Booking ID    : ${booking_id}</br>
-            Scheduled Date and Time : ${checkOrder.slot_date} - ${checkOrder.slot_time}</br> 
-            Location      : ${checkOrder.address}</br>
+           Customer Name    : ${checkOrder.user_name}</br>
+            Contact No   : ${checkOrder.contact_no}</br>
+            Address :    ${checkOrder.address}</br>
+         Vehicle Details: ${checkOrder.vehicle_data}</br>
+        Service Date & Time: ${checkOrder.slot_date} - ${checkOrder.slot_time}</br> 
+            ${reason ? `Cancellation Reason : ${reason}</br>` : ''}
+           
             <p>Thank you for your attention to this update.</p>
             <p>Best regards,<br/>PlusX Electric Team </p>
         </body>
     </html>`;
     emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Portable Charger Service Booking Cancellation ( :Booking ID : ${booking_id} )`, adminHtml); 
 
-    return resp.json({ message: ['Your booking has been successfully canceled. Would you like to reschedule it now?'], status: 1, code: 200 });
+    // return resp.json({ message: ['Your booking has been successfully canceled. Would you like to reschedule it now?'], status: 1, code: 200 });
+    return resp.json({ message: ['Your booking has been successfully cancelled.'], status: 1, code: 200 });
 });
 
 export const userFeedbackPCBooking = asyncHandler(async (req, resp) => {
@@ -635,7 +670,7 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
             SELECT
                 pcb.user_name, pcb.country_code, pcb.contact_no, pcb.address, pcb.latitude, pcb.longitude,
                 pcb.rescheduled_booking, pcb.slot_date, pcb.slot_time, rd.fcm_token, rd.rider_email, 
-                (SELECT CONCAT(vehicle_make, "-", vehicle_model) FROM riders_vehicles as rv WHERE rv.vehicle_id = pcb.vehicle_id ) AS vehicle_data,
+                pcb.vehicle_data
             FROM 
                 portable_charger_booking as pcb
             LEFT JOIN
@@ -652,9 +687,11 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
         if (checkOrder.rescheduled_booking) {
             return resp.json({ message: [`This booking has already been rescheduled.`], status: 0, code: 404 });
         }
-        const oldSlotDateTime = moment(checkOrder.slot_date + ' ' + checkOrder.slot_time, 'YYYY-MM-DD HH:mm:ss').format('YYYY-MM-DD HH:mm:ss');
+        const oldSlotDateTime = moment(checkOrder.slot_date + ' ' + checkOrder.slot_time, 'YYYY-MM-DD HH:mm:ss'); 
+        //.format('YYYY-MM-DD HH:mm:ss');
         let prevDay  = oldSlotDateTime.subtract(24, 'hours').format('YYYY-MM-DD HH:mm:ss');
 
+        console.log(currDateTime,  prevDay) ;
         if (currDateTime > prevDay ) {
             return resp.json({
                 message: ["Apologies, rescheduling is only allowed up to 24 hours before the scheduled service time."],
@@ -685,33 +722,36 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
     
         const htmlUser = `<html>
             <body>
-                <h4>Hi ${checkOrder.user_name},</h4>
-                <p>Thank you for choosing PlusX App! Your booking has been successfully rescheduled. Please find your updated booking details below:</p> <br>
+                <h4>Dear  ${checkOrder.user_name},</h4>
+                <p>We would like to confirm that your booking for the Portable EV Charging Service has been successfully rescheduled.</p> <br>
+                <p>Please find the updated details below:</p>
                 
                 Booking ID: ${booking_id}<br>
-                Scheduled Service Date & Time: ${moment(fSlotDate, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(slot_time, 'HH:mm').format('h:mm A')}<br>
-                <p>If you have any questions or need assistance, feel free to reach out to us via the app or contact our support team.</p>                  
-                <p> We look forward to serving you soon! </p><br/>
-                <p> Warm regards,<br/>PlusX Electric Team</p>
+               Rescheduled Date & Time: ${moment(fSlotDate, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(slot_time, 'HH:mm').format('h:mm A')}<br>
+                <p>Thank you for choosing PlusX Electric. </p>                  
+                <p> If you have any questions or need further assistance, feel free to contact us. </p><br/>
+                <p>Best regards,<br/>PlusX Electric Team</p>
             </body>
         </html>`;
-        emailQueue.addEmail(checkOrder.rider_email, 'Your Rescheduled PlusX Booking Details', htmlUser);
+        emailQueue.addEmail(checkOrder.rider_email, `Booking Rescheduled Successfully -${booking_id}` , htmlUser);
         const formattedDateTime =  moment().utcOffset('+04:00').format('DD MMM YYYY hh:mm A');
         const htmlAdmin = `<html>
             <body>
                 <h4>Dear Admin,</h4>
-                <p>We have received a new booking for our Portable Charger service. Below are the details:</p> 
-                Customer Name : ${checkOrder.user_name}<br>
-                Contact No.   : ${checkOrder.country_code}-${checkOrder.contact_no}<br>
+                <pThis is to inform you that a user has rescheduled their Portable EV Charging Service booking. </p> 
+                <p>Please find the updated booking details below:</p>
+             User Name : ${checkOrder.user_name}<br>
+              User Contact: ${checkOrder.country_code}-${checkOrder.contact_no}<br>
                 Address       : ${checkOrder.address}<br>
                 Booking Time  : ${formattedDateTime}<br> 
-                Schedule Time : ${moment(fSlotDate, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(slot_time, 'HH:mm').format('h:mm A')}<br>       
+               New Scheduled Date & Time: ${moment(fSlotDate, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(slot_time, 'HH:mm').format('h:mm A')}<br>       
                 Vechile Details : ${checkOrder.vehicle_data}<br> 
                 <a href="https://www.google.com/maps?q=${checkOrder.latitude},${checkOrder.longitude}">Address Link</a><br>
+                
                 <p> Best regards,<br/>PlusX Electric Team </p>
             </body>
         </html>`;
-        emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Portable Charger Booking - ${booking_id}`, htmlAdmin);
+        emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Portable Charger Booking Rescheduled - ${booking_id}`, htmlAdmin);
         
         let respMsg = "Booking request received! Your booking has been successfully rescheduled. Our team will arrive at the updated time.";
 
@@ -724,9 +764,10 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
         });
 
     } catch(err) {
+        console.error("Transaction failed:", err);
         // await rollbackTransaction(conn);
         tryCatchErrorHandler(req.originalUrl, err, resp);
-        console.error("Transaction failed:", err);
+        
     } finally {
         // if (conn) conn.release();
     }

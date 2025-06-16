@@ -544,10 +544,10 @@ export const bookingAreaList = asyncHandler(async (req, resp) => {
     query += ' ORDER BY area_name ASC';
     const [result] = await db.execute(query, params);
     return resp.json({
-        status: 1,
-        code: 200,
-        message: ["Area List fetch successfully!"],
-        area_data: result,
-        area_count: result.length
+        status     : 1,
+        code       : 200,
+        message    : ["Area List fetch successfully!"],
+        area_data  : result,
+        area_count : result.length
     });
 });

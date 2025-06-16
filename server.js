@@ -23,6 +23,8 @@ const __dirname  = path.dirname(__filename);
 
 const corsOptions = {
     origin : [
+         'http://192.168.1.41:2424',
+        'http://100.98.63.95:2424',
         'http://192.168.43.223:1112',
         'http://192.168.43.223:3434',
         'http://localhost:1112',
