@@ -494,3 +494,23 @@ export const checkCoupon = async (rider_id, booking_type, coupon_code) => {
         code          : 200
     };
 };
+
+/**
+ * Send a standardized JSON response
+ * @param {Response} resp - Express response object
+ * @param {number} status - 1 for success, 0 for error
+ * @param {number} code - HTTP-like code
+ * @param {Array|string} message - message array or single string
+ * @param {Object} [extra] - Additional fields (optional)
+ */
+export const  ResponseData=(resp,status, code, message, data = {})=> {
+  if (typeof message === 'string') {
+    message = [message];
+  }
+  return resp.json({
+    status,
+    code,
+    message,
+    ...data
+  });
+}

@@ -501,15 +501,16 @@ export const userCancelPCBooking = asyncHandler(async (req, resp) => {
     const html = `<html>
         <body>
             <h4>Dear ${checkOrder.user_name},</h4>
-            <p>We would like to inform you that your booking for the portable charger has been successfully cancelled. Below are the details of your cancelled booking:</p>
+            <p>We would like to inform you that your booking for the portable charger has been successfully cancelled.</p>
+           <p>Below are the details of your cancelled booking:</p>
             Booking ID    : ${booking_id}<br>
             Date and Time : ${moment(checkOrder.slot_date, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(checkOrder.slot_time, 'HH:mm').format('h:mm A')}
-            <p>If this cancellation was made in error or if you wish to reschedule, please feel free to reach out to us. We're happy to assist you.</p>
+
             <p>Thank you for using PlusX Electric. We hope to serve you again soon.</p>
             <p>Best regards,<br/>PlusX Electric Team </p>
         </body>
     </html>`;
-    emailQueue.addEmail(checkOrder.rider_email, `Portable Charger Service Booking Cancellation (Booking ID: ${booking_id})`, html);
+    emailQueue.addEmail(checkOrder.rider_email, `PlusX Electric App: Booking Cancellation`, html);
  
     const adminHtml = `<html>
         <body>

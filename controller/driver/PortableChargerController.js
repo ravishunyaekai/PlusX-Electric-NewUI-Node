@@ -376,7 +376,7 @@ const chargingComplete = async (req, resp) => {
         await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
-        return resp.json({ message: ['Vehicle Charging Completed successfully!'], status: 1, code: 200 });
+        return resp.json({ message: ['Charging complete. Don’t forget to lock your EV.'], status: 1, code: 200 });
     } else {
         return resp.json({ message: ['Sorry this is a duplicate entry!'], status: 0, code: 200 });
     }
