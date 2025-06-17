@@ -99,9 +99,9 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
                 <body>
                     <h4>Dear Admin,</h4>
                     <p>We have received a new booking for our EV Pickup and Drop-Off service. Please find the details below:</p> 
-                    Customer Name  : ${checkOrder.name}<br>
-                    Contact No :${checkOrder.rider_phone}<br>
-                   Address : ${checkOrder.pickup_address}<br>
+                    Customer Name  :  ${checkOrder.name}<br>
+                    Contact No :     ${checkOrder.rider_phone}<br>
+                   Address    :     ${checkOrder.pickup_address}<br>
                     <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a><br>
                    Service Date and Time  : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}<br>
                   Vehicle Details : ${checkOrder.vehicle_data}   <br>
