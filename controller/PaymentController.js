@@ -289,7 +289,7 @@ export const redeemCoupon = async (req, resp) => {
         return resp.json({ status: 0, code: 422, message: ["The coupon you entered has expired."]} );
 
     } else if(coupon.booking_for != booking_type){
-        return resp.json({ status: 0, code: 422, message : ["Coupon code is invalid for this booking type."]} );
+        return resp.json({ status: 0, code: 422, message : ["The coupon you entered is not valid."]} );
 
     } else if(coupon.use_count >= coupon.user_per_user){
         return resp.json({ status: 0, code: 422, message: ["This coupon code has already been used the maximum number of times."]} );

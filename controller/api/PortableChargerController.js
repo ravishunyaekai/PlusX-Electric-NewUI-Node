@@ -194,8 +194,8 @@ export const chargerBooking = asyncHandler(async (req, resp) => {
 
         // 3.  Double-check limit AFTER locking
         if (bookingCount >= bookingLimit) {
-            // await conn.rollback(); // Rollback before returning!
-            return resp.json({ message : ["The slot you have selected is already booked. Please select another slot."], status: 0, code: 422, error: true });
+            // await conn.rollback(); // Rollback before returning! The slot you selected has already been booked. Please select another slot  The slot you have selected is already booked. Please select another slot
+            return resp.json({ message : ["The slot you selected has already been booked. Please select another slot"], status: 0, code: 422, error: true });
         }
         if (service_type.toLowerCase() === "get monthly subscription") {
             const [subsCountRows] = await db.execute(`SELECT COUNT(*) AS count FROM portable_charger_subscription WHERE rider_id = ? AND (total_booking >= 10 OR expiry_date < ?) `,
