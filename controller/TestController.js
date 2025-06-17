@@ -13,6 +13,7 @@ import { createNotification, pushNotification, asyncHandler } from '../utils.js'
 import Stripe from "stripe";
 import dotenv from 'dotenv';
 dotenv.config();
+import axios from "axios";
 
 import { tryCatchErrorHandler } from "../middleware/errorHandler.js";
 
@@ -86,7 +87,6 @@ export const getPaymentdetails = async (req, resp) => {
         return resp.json({ error : error.message });
     }
 }
-
 
 export const stripeWebhook = async (request, response) => {  //pooja@shunyaekai.tech
     
@@ -389,8 +389,8 @@ export const rsaBookingConfirm = async (session_id, payment_intent_id) => {
                     <p>We have received a new booking for the EV Roadside Assistance service. Please find the details below:</p>
                     <P>Please find the details below:</p>
                     <p>Customer Name  : ${checkOrder.name}</p>
-                    <p>Contact Number    : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
-                    <p>Pickup Address : ${checkOrder.pickup_address}</p>
+                    <p>Contact No.    : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
+                    <p>Address : ${checkOrder.pickup_address}</p>
                     Vechile Details   : ${checkOrder.vehicle_data}<br> 
                     <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a><br>           
                     <p>Best regards,<br/> PlusX Electric Team </p>
@@ -412,7 +412,6 @@ export const rsaBookingConfirm = async (session_id, payment_intent_id) => {
         return true;
     }
 };
-
 
 export const failedPODBooking = async () => {
     // const conn = await db.getConnection();

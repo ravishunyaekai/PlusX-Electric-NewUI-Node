@@ -22,9 +22,9 @@ export const getChargingServiceSlotList = asyncHandler(async (req, resp) => {
     let query = `SELECT slot_id, ${formatDateInQuery([('slot_date')])}, start_time, end_time, booking_limit`;
     
     if(fSlotDate >=  moment().format('YYYY-MM-DD')){
-        query += `, (SELECT COUNT(id) FROM charging_service AS cs WHERE DATE(cs.slot_date_time) = '${slot_date}' AND TIME(slot_date_time) = pick_drop_slot.start_time AND order_status NOT IN ("WC", "C") ) AS slot_booking_count`;
+        query += `, (SELECT COUNT(id) FROM charging_service AS cs WHERE DATE(cs.slot_date_time) = '${slot_date}' AND TIME(slot_date_time) = pick_drop_slot.start_time AND order_status NOT IN ("C") ) AS slot_booking_count`;
     }
-    query += ` FROM pick_drop_slot WHERE status = ? AND slot_date = ? ORDER BY start_time ASC`; //, "PNR"
+    query += ` FROM pick_drop_slot WHERE status = ? AND slot_date = ? ORDER BY start_time ASC`; //, "PNR" "WC", 
 
     const [slot] = await db.execute(query, [1, fSlotDate]); 
 
@@ -105,10 +105,10 @@ export const requestService = asyncHandler(async (req, resp) => {
             FROM 
                 charging_service
             WHERE
-                slot_date_time = ? AND order_status NOT IN ("WC", "C")
+                slot_date_time = ? AND order_status NOT IN ("C")
             FOR UPDATE`,
             [ slotDateTime ]
-        ); //, 'PNR'
+        ); //, 'PNR' "WC", 
         const bookingCount = lockedRows.length;
 
         // 2. Get slot limit 

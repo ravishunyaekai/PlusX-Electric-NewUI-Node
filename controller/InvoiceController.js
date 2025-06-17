@@ -310,8 +310,8 @@ export const rsaInvoice = asyncHandler(async (req, resp) => {
                     <p>We have received a new booking for the EV Roadside Assistance service. Please find the details below:</p>
                     <P>Please find the details below:</p>
                     <p>Customer Name   : ${checkOrder.name}</p>
-                    <p>Contact Number  : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
-                    <p>Pickup Address  : ${checkOrder.pickup_address}</p>
+                    <p>Contact No.  : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
+                    <p>Address  : ${checkOrder.pickup_address}</p>
                     <p>Vechile Details : ${checkOrder.vehicle_data}</p>
                     <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a><br>           
                     <p>Best regards,<br/> PlusX Electric Team </p>
