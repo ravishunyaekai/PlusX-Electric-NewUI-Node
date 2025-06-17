@@ -102,24 +102,22 @@ return ResponseData(resp,1, 200, 'Response data fetch successfully!', {data})
 
 export const responseContent = asyncHandler(async (req, resp) => {
  
-    const { module_name } = req.query;
-    const { isValid, errors } = validateFields(
-        { module_name: ["required"] }
-    );
-    if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
- 
-    const columnMap = {
+    const module_name = 'pick-drop'
+    const columnMap   = {
         'portable-charger' : 'portable_price',
         'pick-drop'        : 'pick_drop_price',
         'road-assistance'  : 'roadside_assistance_price'
     };
     const column = columnMap[module_name];
-    if(!column) return ResponseData(resp,0, 400, 'invalid Module name !')
+    if(!column) return resp.json({resp : 0, code : 400, msg : 'invalid Module name !'} );
+ 
+    const [responseContent] = await db.execute(`select content from response_content where module_name=? and status=1 `, [module_name]);
+    if (!responseContent || responseContent.length === 0) return  resp.json({resp : 0, code : 400, msg : 'content not found!'} ); 
  
     const [[contentdata]] = await db.execute(`
         Select 
             (SELECT ${column} FROM booking_price ) AS price, 
-            (select content from response_content where module_name=? and status=1) as content, 
+            
             heading, image 
         FROM 
             response_module 
@@ -127,26 +125,26 @@ export const responseContent = asyncHandler(async (req, resp) => {
             name = ? and status = 1 
         LIMIT 1`, 
     [module_name]);
-
-    if(!contentdata) return  ResponseData(resp,0, 400, 'content not found!')
-    const { price, heading, image, content } = contentdata;
-
-    if (!content || content.length === 0) return  ResponseData(resp,0, 400, 'Content not nound !')
-//  console.log("price, heading, image, content",price, heading, image, content)
+ 
+    if(!contentdata) return  resp.json({resp : 0, code : 400, msg : 'content not found!'} );
+    const { price, heading, image } = contentdata;
+ 
+    const contentArray = responseContent.map(row => {
+        return row.content.replace(/AED\s*\d+(\.\d{1,2})?/gi, `AED ${price}`);
+    });
+ 
     let data = {
-        image : image,
-        price : price || 0,
-        heading : heading,
-        conent  
-    }
-    // return ResponseData(resp,1, 200, 'Response data fetch successfully!', {data})
-
-     return resp.json({
-    status:200,
-    code:1,
-    message:"Response data fetch successfully!",
-    data
-  });
-
     
+        image   : image,
+        price   : price || 0,
+        heading : heading,
+        content  : contentArray
+    }
+  return resp.json({   status: 1,
+    code: 200,
+    message: [
+        "Response data fetch successfully!"
+    ],
+    data} );
+   
 });

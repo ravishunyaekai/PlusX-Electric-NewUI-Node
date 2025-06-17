@@ -374,6 +374,7 @@ const chargingComplete = async (req, resp) => {
         const message = `Charging complete, please lock your EV.`;
         await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
         await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
+       
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         return resp.json({ message: ['Charging complete. Don’t forget to lock your EV.'], status: 1, code: 200 });

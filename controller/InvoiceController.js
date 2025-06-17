@@ -29,7 +29,7 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
         
         const checkOrder = await queryDB(`
             SELECT 
-                rd.fcm_token, cs.name, cs.slot_date_time, cs.pickup_address, cs.pickup_latitude, cs.pickup_longitude, rd.rider_email 
+               CONCAT(cs.country_code, ' ', cs.contact_no) AS rider_phone, rd.fcm_token, cs.vehicle_data, cs.name, cs.slot_date_time, cs.pickup_address, cs.pickup_latitude, cs.pickup_longitude, rd.rider_email
             FROM 
                 charging_service as cs
             LEFT JOIN
@@ -66,6 +66,7 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
                 const session = await stripe.checkout.sessions.retrieve(session_id);
                 paymentIntentId = session.payment_intent ;
             }
+         //    console.log("checkOrder.pickup_address",checkOrder.pickup_address,'rider_phone',rider_phone)
             const updt = await updateRecord('charging_service', { order_status : 'CNF', payment_intent_id : paymentIntentId }, ['request_id', 'rider_id'], [request_id, rider_id] );  //, conn
 
             const href    = 'charging_service/' + request_id;
@@ -74,7 +75,7 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
             createNotification(heading, desc, 'Charging Service', 'Rider', 'Admin','', rider_id, href);
             createNotification(heading, desc, 'Charging Service', 'Admin', 'Rider', rider_id, '', href);
             pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
-        
+   
             const htmlUser = `<html>
                 <body>
                     <h4>Dear ${checkOrder.name},</h4>
@@ -83,7 +84,7 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
                     <br>
                     <ul>
                     <li>Booking ID: ${request_id}</li>
-                    <li>Date and Time of Service : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</li>
+                    <li>Service Date and Time  : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</li>
                     <li>Address : ${checkOrder.pickup_address}</li>
                     </ul>
                     <p>We look forward to serving you and providing a seamless EV experience.</p>   
@@ -97,15 +98,18 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
             const htmlAdmin = `<html>
                 <body>
                     <h4>Dear Admin,</h4>
-                    <p>We have received a new booking for our Valet Charging service via the PlusX app. Below are the details:</p> 
+                    <p>We have received a new booking for our EV Pickup and Drop-Off service. Please find the details below:</p> 
                     Customer Name  : ${checkOrder.name}<br>
-                    Pickup & Drop Address : ${checkOrder.pickup_address}<br>
-                    Booking Date & Time : ${dubaiTime}<br> 
-                    <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a><br>               
+                    Contact No :${checkOrder.rider_phone}<br>
+                   Address : ${checkOrder.pickup_address}<br>
+                    <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a><br>
+                   Service Date and Time  : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}<br>
+                  Vehicle Details : ${checkOrder.vehicle_data}   <br>
+                                   
                     <p> Best regards,<br/> PlusX Electric Team </p>
                 </body>
             </html>`;
-            emailQueue.addEmail(process.env.MAIL_CS_ADMIN, `Valet Charging Service Booking Received - ${request_id}`, htmlAdmin);
+            emailQueue.addEmail(process.env.MAIL_CS_ADMIN, `EV Pickup and Drop-Off - ${request_id}`, htmlAdmin);
             // await commitTransaction(conn);
             let responseMsg = 'We have received your booking. Our team will get in touch with you soon!';
             return resp.json({ message: [responseMsg], status: 1, code: 200 });
@@ -198,12 +202,12 @@ export const portableChargerInvoice = asyncHandler(async (req, resp) => {
             const htmlAdmin = `<html>
                 <body>
                     <h4>Dear Admin,</h4>
-                    <p>We have received a new booking for our Portable Charger service. Below are the details:</p> 
+                    <p>We have received a new booking for our Portable Charger service. Please find the details below:</p> 
                     Customer Name : ${checkOrder.user_name}<br>
                     Contact No.   : ${checkOrder.country_code}-${checkOrder.contact_no}<br>
                     Address       : ${checkOrder.address}<br>
-                    Booking Time  : ${dubaiTime}<br>                    
-                    Schedule Time : ${moment(checkOrder.slot_date, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(checkOrder.slot_time, 'HH:mm').format('h:mm A')}<br>       
+                                     
+                  Service Date & Time : ${moment(checkOrder.slot_date, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(checkOrder.slot_time, 'HH:mm').format('h:mm A')}<br>       
                     Vechile Details : ${checkOrder.vehicle_data}<br> 
                     <a href="https://www.google.com/maps?q=${checkOrder.latitude},${checkOrder.longitude}">Address Link</a><br>
                     <p> Best regards,<br/>PlusX Electric Team </p>
@@ -300,16 +304,16 @@ export const rsaInvoice = asyncHandler(async (req, resp) => {
                     <p>Booking ID: ${request_id}</p>
                     <p>Address: ${checkOrder.pickup_address}</p>    
                     <p>We look forward to serving you and providing a seamless EV charging experience.</p>
-                    <p> Regards,<br/> PlusX Electric App </p>
+                    <p>Best regards,<br/> PlusX Electric Team </p>
                 </body>
             </html>`;
-            emailQueue.addEmail(checkOrder.rider_email, 'PlusX Electric App: Booking Confirmation for EV Roadside Assistance Service', htmlUser);
+            emailQueue.addEmail(checkOrder.rider_email, 'PlusX Electric App: Booking Confirmation for EV Roadside Assistance Service ', htmlUser);
             const htmlAdmin = `<html>
                 <body>
                     <h4>Dear Admin,</h4>
-                    <p>We have received a new booking for our EV Roadside Assistance service. Below are the details:</p>
+                    <p>We have received a new booking for the EV Roadside Assistance service. Please find the details below:</p>
                     <p>Customer Name   : ${checkOrder.name}</p>
-                    <p>Contact Number. : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
+                    <p>Contact No. : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
                     <p>Address         : ${checkOrder.pickup_address}</p>
                     <p>Vechile Details   : ${checkOrder.vehicle_data}</p>
                     <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a><br>           
