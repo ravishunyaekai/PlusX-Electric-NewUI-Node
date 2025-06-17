@@ -70,7 +70,7 @@ app.get('/.well-known/apple-app-site-association', (req, resp) => {
     });
 });
 app.get('/pod/id6503144034', (req,res, resp) => {
-res.redirect('https://www.plusxelectric.com');
+    res.redirect('https://www.plusxelectric.com');
 });
 
 app.get('/payment-success', (req, res) => {

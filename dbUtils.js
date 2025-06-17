@@ -133,7 +133,7 @@ export const getPaginatedData = async ({
     let whereCondition      = '';
     let liveSearchCondition = '';
     const queryParams       = [];
-
+    // console.log(whereOperator)
     // Construct `WHERE` clause for static filters
     if (whereField.length > 0 && whereValue.length > 0) {
         whereField.forEach((field, index) => {
@@ -170,7 +170,7 @@ export const getPaginatedData = async ({
 
     // Final SQL query
     const query = `SELECT SQL_CALC_FOUND_ROWS ${columns} FROM ${tableName}${joinClause}${finalWhereCondition} ORDER BY ${sortColumn} ${sortOrder} LIMIT ${start}, ${parseInt(limit, 10)}`;
-    //   console.log(query)
+    console.log(query)
     try {
         const [rows]        = await db.execute(query, queryParams);
         const [[{ total }]] = await db.query('SELECT FOUND_ROWS() AS total');

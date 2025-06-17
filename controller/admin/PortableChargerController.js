@@ -187,7 +187,7 @@ export const chargerBookingList = async (req, resp) => {
 
         const params = {
             tableName : 'portable_charger_booking',
-            columns   : `booking_id, rider_id, user_name, status, address_alert,
+            columns   : `booking_id, rider_id, user_name, status, address_alert, rescheduled_booking, 
             (select rsa_name from rsa where rsa.rsa_id = portable_charger_booking.rsa_id) as rsa_name, 
                 ${formatDateInQuery(['slot_date'])}, concat(slot_date, " ", slot_time) as slot_time, ${formatDateTimeInQuery(['created_at'])}, area`,
             sortColumn : 'slot_date DESC, slot_time ASC',
@@ -964,7 +964,7 @@ export const customerChargerBookingList = async (req, resp) => {
 
         const params = {
             tableName: 'portable_charger_booking',
-            columns: `booking_id, rider_id, rsa_id, charger_id, vehicle_id, service_name, service_price, service_type, user_name, country_code, contact_no, status, 
+            columns: `booking_id, rider_id, rsa_id, charger_id, vehicle_id, service_name, service_price, service_type, user_name, country_code, contact_no, status, rescheduled_booking, 
             (select rsa_name from rsa where rsa.rsa_id = portable_charger_booking.rsa_id) as rsa_name, 
                 ${formatDateInQuery(['slot_date'])}, concat(slot_date, " ", slot_time) as slot_time, ${formatDateTimeInQuery(['created_at'])}`,
             sortColumn : 'slot_date',

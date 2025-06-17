@@ -317,7 +317,7 @@ export const rsaInvoice = asyncHandler(async (req, resp) => {
                     <p>Address         : ${checkOrder.pickup_address}</p>
                     <p>Vechile Details   : ${checkOrder.vehicle_data}</p>
                     <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a><br>           
-                    <p> Best regards,<br/> PlusX Electric App </p>
+                    <p>Best regards,<br/> PlusX Electric Team </p>
                 </body>
             </html>`;
             

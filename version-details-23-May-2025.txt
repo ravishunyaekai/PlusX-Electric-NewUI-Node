@@ -1,0 +1,20 @@
+
+
+Start Date : 23-05-2025
+
+    1. Notification Click action in Admin Panel
+
+    2. Invoice calculation changes for POD, RSA and valet in Admin Panel
+        
+    3. Valat booking Inprocess List, Remove PNR Status from list  in API
+
+    4. Feedback mail Notification for POD, RSA and valet  In API
+
+    5. Add Area In POD, RSA and valet In API
+
+    6. Area filter in Admin Panel for POD
+       
+
+    7. Row limit in Booking List for POD, RSA and valet in Admin Panel
+    
+End Date : 23-05-2025
