@@ -1,7 +1,8 @@
 import db from "../../config/db.js";
 import { queryDB } from '../../dbUtils.js';
 import validateFields from "../../validation.js";
-import { mergeParam, getOpenAndCloseTimings, asyncHandler} from '../../utils.js';
+
+import { mergeParam, getOpenAndCloseTimings, asyncHandler, getSingleRoute, getMultipleRoute} from '../../utils.js';
 
 export const stationList = asyncHandler(async (req, resp) => {
     const {rider_id, latitude, longitude, page_no, search_text, sort_by } = mergeParam(req);
@@ -24,11 +25,14 @@ export const stationList = asyncHandler(async (req, resp) => {
     const [[{ total }]] = await db.execute(countQuery, countParams);
     const total_page = Math.ceil(total / limit) || 1;
     
-    let query = `SELECT station_id, station_name, station_image, latitude, longitude, charging_for, charger_type, charging_point, price, status, always_open, 
+    let query = `
+    SELECT 
+        station_id, station_name, station_image, latitude, longitude, charging_for, charger_type, charging_point, price, status, always_open, 
         REPLACE(open_days, "_", ", ") AS open_days, 
         REPLACE(open_timing, "_", ", ") AS open_timing, 
         (6367 * ACOS(COS(RADIANS(?)) * COS(RADIANS(latitude)) * COS(RADIANS(longitude) - RADIANS(?)) + SIN(RADIANS(?)) * SIN(RADIANS(latitude))) ) AS distance 
-    FROM public_charging_station_list `;
+    FROM 
+        public_charging_station_list `;
     let queryParams = [latitude, longitude, latitude];
     
     if (search_text && search_text.trim() !== '') {
@@ -39,9 +43,13 @@ export const stationList = asyncHandler(async (req, resp) => {
     query += ` ORDER BY distance ${sortOrder} LIMIT ${start}, ${limit}`;
     
     const [stations] = await db.execute(query, queryParams);
+
+    const origin       = `${latitude}, ${longitude}`;
+    const routeResults = await getMultipleRoute(origin, stations);
+
     return resp.json({
         message : ["Charging Station List fetched successfully!"],
-        data    : stations,
+        data    : routeResults,
         total_page,
         status   : 1,
         code     : 200,
@@ -59,19 +67,28 @@ export const stationDetail = asyncHandler(async (req, resp) => {
         longitude  : ["required"]
     });
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
-    
-    const station = await queryDB(`SELECT station_id, station_name, address, status, station_image, latitude, longitude, description, charging_for, charger_type, charging_point, price, status, always_open, 
-        REPLACE(open_days, "_", ", ") AS open_days, 
-        REPLACE(open_timing, "_", ", ") AS open_timing, 
-        (6367 * ACOS(COS(RADIANS(?)) * COS(RADIANS(latitude)) * COS(RADIANS(longitude) - RADIANS(?)) + SIN(RADIANS(?)) * SIN(RADIANS(latitude))) ) AS distance,
-        available_charging_point, occupied_charging_point 
-        FROM public_charging_station_list WHERE station_id = ?`, 
-        [latitude, longitude, latitude, station_id]
+
+    const station = await queryDB(`
+        SELECT 
+            station_id, station_name, address, status, station_image, latitude, longitude, description, charging_for, charger_type, charging_point, price, status, always_open, 
+            REPLACE(open_days, "_", ", ") AS open_days, 
+            REPLACE(open_timing, "_", ", ") AS open_timing, 
+            available_charging_point, occupied_charging_point 
+        FROM 
+            public_charging_station_list 
+        WHERE 
+            station_id = ?`, 
+        [station_id]
     );
-    station.schedule = getOpenAndCloseTimings(station);  //toString
+    station.schedule = getOpenAndCloseTimings(station);
 
     [gallery] = await db.execute(`SELECT image_name FROM public_charging_station_gallery WHERE station_id = ? ORDER BY id DESC LIMIT 5`, [station_id]);
     const imgName = gallery.map(row => row.image_name);
+
+    const origin       = `${latitude}, ${longitude}`;
+    const destination  = `${station.latitude}, ${station.longitude}`;
+    const distancedata = await getSingleRoute(origin, destination)
+    station.distance   = parseFloat(distancedata.distance );
 
     return resp.json({
         status       : 1,
@@ -89,22 +106,27 @@ export const nearestChargerList = asyncHandler(async (req, resp) => {
     const { isValid, errors } = validateFields(mergeParam(req), {
         rider_id: ["required"], latitude: ["required"], longitude: ["required"]
     });
-
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
 
-    const [chargers] = await db.execute(`SELECT station_id, station_name, address, status, station_image, latitude, longitude, description, charging_for, charger_type, charging_point, price, status, always_open, 
-        REPLACE(open_days, "_", ", ") AS open_days, 
-        REPLACE(open_timing, "_", ", ") AS open_timing, 
-        (6367 * ACOS(COS(RADIANS(?)) * COS(RADIANS(latitude)) * COS(RADIANS(longitude) - RADIANS(?)) + SIN(RADIANS(?)) * SIN(RADIANS(latitude))) ) AS distance 
-        FROM public_charging_station_list ORDER BY distance ASC LIMIT 20
-        `,[latitude, longitude ,latitude]
+    const [chargers] = await db.execute(`
+        SELECT 
+            station_id, station_name, address, status, station_image, latitude, longitude, description, charging_for, charger_type, charging_point, price, status, always_open, 
+            REPLACE(open_days, "_", ", ") AS open_days, 
+            REPLACE(open_timing, "_", ", ") AS open_timing,
+            (6367 * ACOS(COS(RADIANS(?)) * COS(RADIANS(latitude)) * COS(RADIANS(longitude) - RADIANS(?)) + SIN(RADIANS(?)) * SIN(RADIANS(latitude))) ) AS distance  
+        FROM 
+            public_charging_station_list 
+        ORDER BY 
+            distance ASC 
+        LIMIT 20
+        `,[latitude, longitude ,latitude] 
     );
-
+    const origin       = `${latitude}, ${longitude}`;
+    const routeResults = await getMultipleRoute(origin, chargers);
     return resp.json({
-        status:1 ,
-        code: 200, 
-        message: ['Nearest Portable Charger List fetch successfully!'],
-        data: chargers
+        status  : 1 ,
+        code    : 200, 
+        message : ['Nearest Portable Charger List fetch successfully!'],
+        data    : routeResults
     });
-
 });

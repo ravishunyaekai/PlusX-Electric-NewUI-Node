@@ -435,7 +435,7 @@ const chargerPickedUp = async (req, resp) => {
                     <p>We hope you're doing well.</p>
                     <p>Thank you for choosing PlusX Electric for your EV Roadside Assistance service. We're pleased to inform you that the service has been successfully completed.</p>
                     <p>We truly appreciate your trust in us and look forward to serving you again.</p>
-                    <p> Regards,<br/>PlusX Electric Team </p>
+                    <p>Best Regards,<br/>PlusX Electric Team </p>
                 </body>
             </html>`;
             // , and the details of your invoice are attached

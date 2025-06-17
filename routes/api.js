@@ -38,7 +38,7 @@ import {
     getChargingServiceSlotList, requestService, listServices, getServiceOrderDetail, getInvoiceList, getInvoiceDetail, cancelValetBooking, userFeedbackValetBooking
 } from '../controller/api/ChargingServiceController.js';
 
-import { getPaymentSessionData, getPaymentdetails, failedPODBooking, failedValetBooking, failedRSABooking } from '../controller/TestController.js';
+import { getPaymentSessionData, getPaymentdetails } from '../controller/TestController.js';
 
 import rateLimit from 'express-rate-limit';
 import { responseContent } from "../controller/api/contentController.js";
@@ -260,8 +260,8 @@ router.post('/auto-pay', autoPay);
 router.get('/get-payment-session-data', getPaymentSessionData); 
 router.get('/get-payment-data', getPaymentdetails); 
 
-router.post('/failed-pod-booking', failedPODBooking); 
-router.post('/failed-valet-booking', failedValetBooking); 
-router.post('/failed-rsa-booking', failedRSABooking); 
+// router.post('/failed-pod-booking', failedPODBooking); 
+// router.post('/failed-valet-booking', failedValetBooking); 
+// router.post('/failed-rsa-booking', failedRSABooking); 
 
 export default router;

@@ -144,7 +144,8 @@ export const roadAssistanceList = asyncHandler(async (req, resp) => {
         total_page : totalPage,
         total      : total,
         inProcessBookingList,
-        base_url   : `${req.protocol}://${req.get('host')}/uploads/road-assistance/`,       
+        base_url   : `${req.protocol}://${req.get('host')}/uploads/road-assistance/`, 
+        noResultMsg : 'There are no recent bookings. Please schedule your booking now.'      
     });
 });
 

@@ -495,6 +495,57 @@ export const checkCoupon = async (rider_id, booking_type, coupon_code) => {
     };
 };
 
+
+// Get Route Map Single or Multiple
+export const getSingleRoute = async (origin, destination) => {
+    const apiKey = process.env.Google_map_key;
+
+    // const origin      = '24.9998332,55.1217449';    // Bangalore
+    // const destination = '25.213799,55.31758357892679';   // Chennai
+
+    const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&key=${apiKey}`;
+
+    try {
+        const response = await axios.get(url);
+        const data     = response.data;
+
+        if (data.status === 'OK') {
+            const route = data.routes[0];
+            const leg   = route.legs[0];
+
+            // Optional: Return for frontend
+            return {
+                distance : leg.distance.text,
+                // duration : leg.duration.text,
+                // polyline : route.overview_polyline.points,
+                // mapUrl   : `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`,
+            };
+        } else {
+            console.error('Google API error:', data.status);
+            return {err : data.status} ;
+        }
+    } catch (err) {
+        console.error('Request failed:', err.message);
+        return  {err : data.status} ;
+    }
+};
+export const getMultipleRoute = async (origin, destinations) => {
+    const apiKey  = process.env.Google_map_key;
+    const destStr = destinations.map(d => `${d.latitude},${d.longitude}`).join('|');
+    
+    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origin}&destinations=${destStr}&key=${apiKey}`;
+    const res = await axios.get(url);
+
+    res.data.rows[0].elements.forEach((element, index) => {
+
+        if (element.status === 'OK') {
+            destinations[index].distance = parseFloat(element.distance.text);
+            destinations[index].duration = element.duration.text;
+        }
+    });
+    return destinations;
+}
+
 /**
  * Send a standardized JSON response
  * @param {Response} resp - Express response object
