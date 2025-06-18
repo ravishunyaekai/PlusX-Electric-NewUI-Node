@@ -44,7 +44,6 @@ import rateLimit from 'express-rate-limit';
 import { responseContent } from "../controller/api/contentController.js";
 const router = Router();
  router.get('/response-content',apiAuthorization,responseContent);
-
 const limiter = rateLimit({
     windowMs     : 70 * 1000,  //15 * 
     max          : 2,

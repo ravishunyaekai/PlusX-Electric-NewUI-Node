@@ -546,14 +546,6 @@ export const getMultipleRoute = async (origin, destinations) => {
     return destinations;
 }
 
-/**
- * Send a standardized JSON response
- * @param {Response} resp - Express response object
- * @param {number} status - 1 for success, 0 for error
- * @param {number} code - HTTP-like code
- * @param {Array|string} message - message array or single string
- * @param {Object} [extra] - Additional fields (optional)
- */
 export const  ResponseData=(resp,status, code, message, data = {})=> {
   if (typeof message === 'string') {
     message = [message];

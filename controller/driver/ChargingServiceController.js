@@ -331,14 +331,31 @@ const chargingComplete = async (req, resp) => {
 const vehicleDrop = async (req, resp) => {
     const { booking_id, rsa_id, latitude, longitude } = req.body;
 
+    // const checkOrder = await queryDB(`
+    //     SELECT rider_id, 
+    //         (SELECT fcm_token FROM riders WHERE rider_id = charging_service_assign.rider_id limit 1) AS fcm_token
+    //     FROM 
+    //         charging_service_assign
+    //     WHERE 
+    //         order_id = ? AND rsa_id = ? AND status = 1
+    //     LIMIT 1
+    // `,[booking_id, rsa_id]);
+
     const checkOrder = await queryDB(`
-        SELECT rider_id, 
-            (SELECT fcm_token FROM riders WHERE rider_id = charging_service_assign.rider_id limit 1) AS fcm_token
-        FROM 
-            charging_service_assign
-        WHERE 
-            order_id = ? AND rsa_id = ? AND status = 1
-        LIMIT 1
+        SELECT 
+    csa.rider_id,
+    r.fcm_token,
+    r.rider_email,
+    r.rider_name
+FROM 
+    charging_service_assign csa
+LEFT JOIN 
+    riders r ON r.rider_id = csa.rider_id
+WHERE 
+    csa.order_id = ? 
+    AND csa.rsa_id =? 
+    AND csa.status = 1
+LIMIT 1
     `,[booking_id, rsa_id]);
 
     if (!checkOrder) {
@@ -365,7 +382,22 @@ const vehicleDrop = async (req, resp) => {
         await createNotification(title, message, 'Charging Service', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
         await createNotification(title, message, 'Charging Service', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
-        await valetChargerInvoice(checkOrder.rider_id, booking_id); 
+       
+         const html = `<html>
+                <body>
+                    <h4>Dear ${checkOrder.rider_name}</h4>
+                    <p>We hope you're doing well.</p>
+                    <p>Thank you for choosing PlusX Electric for your EV Pickup & Drop-off service. We're pleased to inform you that your service has been successfully completed.</p>
+                    <p>We truly appreciate your trust in us and look forward to serving you again.</p>
+                    <p>Best Regards,<br/> PlusX Electric Team </p>
+                </body>
+            </html>`;
+            // , and the details of your invoice are attached
+            // const attachment = {
+            //     filename: `${invoiceId}-invoice.pdf`, path: pdf.pdfPath, contentType: 'application/pdf'
+            // }
+            emailQueue.addEmail(checkOrder.rider_email, 'PlusX Electric: Your EV Pickup & Drop-off Service is Now Complete', html); //, attachment
+
         return resp.json({ message: ['Vehicle drop-off successfully!'], status: 1, code: 200 });
     } else {
         return resp.json({ message: ['Sorry this is a duplicate entry!'], status: 0, code: 200 });
@@ -442,21 +474,9 @@ const workComplete = async (req, resp) => {
         // const pdf = await generatePdf(templatePath, invoiceData, filename, savePdfDir, req);
 
         // if(pdf.success){
-            const html = `<html>
-                <body>
-                    <h4>Dear ${data.name}</h4>
-                    <p>We hope you're doing well.</p>
-                    <p>Thank you for choosing PlusX Electric for your EV Pickup & Drop-off service. We're pleased to inform you that your service has been successfully completed.</p>
-                    <p>We truly appreciate your trust in us and look forward to serving you again.</p>
-                    <p>Best Regards,<br/> PlusX Electric Team </p>
-                </body>
-            </html>`;
-            // , and the details of your invoice are attached
-            // const attachment = {
-            //     filename: `${invoiceId}-invoice.pdf`, path: pdf.pdfPath, contentType: 'application/pdf'
-            // }
-            emailQueue.addEmail(data.rider_email, 'PlusX Electric: Your EV Pickup & Drop-off Service is Now Complete', html); //, attachment
+           
         // }
+         await valetChargerInvoice(checkOrder.rider_id, booking_id);
         return resp.json({ message: ['Work completed! successfully!'], status: 1, code: 200 });
     } else {
         return resp.json({ message: ['Sorry this is a duplicate entry!'], status: 0, code: 200 });
