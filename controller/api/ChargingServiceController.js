@@ -176,7 +176,7 @@ const vehicle_data = vehicleRow[0]?.db_vehicle_data;
         // if (conn) conn.release();
     }
 });
-export const requestService = asyncHandler(async (req, resp) => {
+export const paramjeetOldrequestService = asyncHandler(async (req, resp) => {
     
     const { rider_id, name, country_code, contact_no, pickup_address, pickup_latitude, pickup_longitude, parking_number='', parking_floor='', vehicle_id, slot_date_time, slot_id, price = 0, order_status = 'PNR', device_name = '', coupon_code='', address_id } = mergeParam(req);
 
@@ -220,21 +220,6 @@ export const requestService = asyncHandler(async (req, resp) => {
             LIMIT 1 `,
         [ vehicle_id,rider_id, vehicle_id, rider_id, address_id ]);
 
-       const [vehicleRow] = await db.execute(`
-  SELECT CONCAT(
-    vehicle_make, ', ',
-    vehicle_model, ', ',
-    vehicle_specification, ', ',
-    emirates, '-', 
-    vehicle_code, '-', 
-    vehicle_number
-  ) AS db_vehicle_data
-  FROM riders_vehicles
-  WHERE vehicle_id = ?
-  LIMIT 1
-`, [vehicle_id]);
-
-const vehicle_data = vehicleRow[0]?.db_vehicle_data;
 
 
         if(!riderAddress) return resp.json({ message : ["Address Id not valid!"], status: 0, code: 422, error: true });
@@ -328,6 +313,140 @@ const vehicle_data = vehicleRow[0]?.db_vehicle_data;
     }
 });
 //end requestService
+export const requestService = asyncHandler(async (req, resp) => {
+    
+    const { rider_id, name, country_code, contact_no, pickup_address, pickup_latitude, pickup_longitude, parking_number='', parking_floor='', vehicle_id, slot_date_time, slot_id, price = 0, order_status = 'PNR', device_name = '', coupon_code='', address_id } = mergeParam(req);
+
+    const { isValid, errors } = validateFields(mergeParam(req), {
+        rider_id         : ["required"],
+        name             : ["required"],
+        country_code     : ["required"],
+        contact_no       : ["required"],
+        slot_id          : ["required"],
+        pickup_address   : ["required"],
+        pickup_latitude  : ["required"],
+        pickup_longitude : ["required"],
+        vehicle_id       : ["required"],
+        // parking_number : ["required"],
+        // parking_floor  : ["required"],
+        slot_date_time    : ["required"],
+        address_id        : ["required"],
+    });
+    if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
+    
+    // const conn = await startTransaction();
+    try {
+        const riderAddress = await queryDB(`
+            SELECT 
+                landmark, (SELECT CONCAT(
+    vehicle_make, ', ',
+    vehicle_model, ', ',
+    vehicle_specification, ', ',
+    emirates, '-', 
+    vehicle_code, '-', 
+    vehicle_number
+  ) 
+  FROM riders_vehicles
+  WHERE vehicle_id = ?) AS vehicle_data, ( SELECT pick_drop_price FROM booking_price LIMIT 1) as booking_price
+            FROM 
+                rider_address
+            WHERE 
+                rider_id =? and address_id = ? order by id desc
+            LIMIT 1 `,
+        [ vehicle_id, rider_id, address_id ]);
+
+
+
+        if(!riderAddress) return resp.json({ message : ["Address Id not valid!"], status: 0, code: 422, error: true });
+        if(riderAddress.vehicle_data == '') return resp.json({ message : ["Vehicle Id not valid!"], status: 0, code: 422, error: true });
+    
+        const vatAmt       = Math.floor(( parseFloat(riderAddress.booking_price) ) * 5) / 100; 
+        const bookingPrice = Math.floor( ( parseFloat(riderAddress.booking_price) + vatAmt ) * 100) ;
+
+        if(parseFloat(price) != bookingPrice && coupon_code == '') { 
+            return resp.json({ message : ['coupon_code is required'], status: 0, code: 422, error: true });
+        }
+        else if(parseFloat(price) != bookingPrice && coupon_code) {
+            const servicePrice = parseFloat(price) ;
+            
+            const couponData   = await checkCoupon(rider_id, 'Valet Charging', coupon_code);
+          
+            if(couponData.status == 0 ){
+                return resp.json({ message : [couponData.message], status: 0, code: 422, error: true });
+
+            } else if(servicePrice != couponData.service_price ){
+                return resp.json({ message : ['Booking price is not valid!'], status: 0, code: 422, error: true, bookingPrice : couponData.service_price });
+            }
+        }  
+        const area = riderAddress.landmark;
+
+        const fSlotDateTime = moment(slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('YYYY-MM-DD HH:mm:ss');
+        const currDateTime  = moment().utcOffset(4).format('YYYY-MM-DD HH:mm:ss');
+        if (fSlotDateTime < currDateTime) return resp.json({status: 0, code: 422, message: ["Invalid slot, Please select another slot"]});
+        
+        const fSlotDate    = moment(slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('YYYY-MM-DD');
+        const slot_time    = moment(slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('HH:mm:ss');
+        const slotDateTime = moment(slot_date_time).format('YYYY-MM-DD HH:mm:ss');
+        // 1. Lock all bookings for this slot
+        const [lockedRows] = await db.execute(
+            `SELECT
+                id
+            FROM 
+                charging_service
+            WHERE
+                slot_date_time = ? AND order_status NOT IN ("WC", "C")
+            FOR UPDATE`,
+            [ slotDateTime ]
+        ); //, 'PNR'
+        const bookingCount = lockedRows.length;
+
+        // 2. Get slot limit 
+        const [slotLimitRows] = await db.execute( `
+            SELECT
+                booking_limit
+            FROM 
+                pick_drop_slot
+            WHERE
+                slot_date = ? AND start_time = ? LIMIT 1 
+            FOR UPDATE`,
+            [fSlotDate, slot_time]
+        );
+        if (slotLimitRows.length === 0) {
+            return resp.json({ message : ["The slot you have selected is invalid!"], status: 0, code: 422, error: true });
+        }
+        const bookingLimit = slotLimitRows[0].booking_limit;
+
+        // 3.  Double-check limit AFTER locking
+        if (bookingCount >= bookingLimit) {
+            return resp.json({ message : ["The slot you have selected is already booked. Please select another slot."], status: 0, code: 422, error: true });
+        }
+        const insert = await insertRecord('charging_service', [
+            'request_id','vehicle_data', 'rider_id', 'name', 'country_code', 'contact_no', 'vehicle_id', 'slot', 'slot_date_time', 'pickup_address', 'parking_number', 'parking_floor', 
+            'price', 'order_status', 'pickup_latitude', 'pickup_longitude', 'device_name', 'area', 'address_id'
+        ], [
+            'CS',riderAddress.vehicle_data, rider_id, name, country_code, contact_no, vehicle_id, slot_id, slotDateTime, pickup_address, parking_number, parking_floor, price, order_status, pickup_latitude, pickup_longitude, device_name, area, address_id
+        ]);
+
+        if(insert.affectedRows === 0) return resp.json({status:0, code:200, message : ["Oops! Something went wrong. Please try again."]}); 
+
+        const requestId = 'CS' + String( insert.insertId ).padStart(4, '0');
+        await updateRecord('charging_service', { request_id : requestId }, ['id'], [insert.insertId] );
+
+        // await commitTransaction(conn);
+        return resp.json({
+            message    : [ 'We have received your booking. Our team will get in touch with you soon!' ],
+            status     : 1,
+            service_id : requestId,
+            code       : 200,
+        });
+    }catch(err){
+        // await rollbackTransaction(conn);
+        console.error("Transaction failed:", err);
+        tryCatchErrorHandler(req.originalUrl, err, resp );
+    } finally {
+        // if (conn) conn.release();
+    }
+});
 
 export const listServices = asyncHandler(async (req, resp) => {
     const {rider_id, page_no, bookingStatus } = mergeParam(req);

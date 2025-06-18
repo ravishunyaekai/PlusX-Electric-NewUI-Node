@@ -342,19 +342,10 @@ const vehicleDrop = async (req, resp) => {
     // `,[booking_id, rsa_id]);
 
     const checkOrder = await queryDB(`
-        SELECT 
-    csa.rider_id,
-    r.fcm_token,
-    r.rider_email,
-    r.rider_name
-FROM 
-    charging_service_assign csa
-LEFT JOIN 
-    riders r ON r.rider_id = csa.rider_id
-WHERE 
-    csa.order_id = ? 
-    AND csa.rsa_id =? 
-    AND csa.status = 1
+        SELECT  csa.rider_id,r.fcm_token,r.rider_email,r.rider_name
+FROM  charging_service_assign csa
+LEFT JOIN riders r ON r.rider_id = csa.rider_id
+WHERE csa.order_id = ? AND csa.rsa_id =? AND csa.status = 1
 LIMIT 1
     `,[booking_id, rsa_id]);
 
