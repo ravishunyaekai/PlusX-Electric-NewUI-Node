@@ -187,7 +187,7 @@ export const chargerBooking = asyncHandler(async (req, resp) => {
             [fSlotDate, slot_time]
         );
         if (slotLimitRows.length === 0) {
-            return resp.json({ message: ["The slot you have selected is invalid!"], status: 0, code: 422, error: true });
+            return resp.json({ message: ["The slot you selected has is invalid!. Please select another slot"], status: 0, code: 422, error: true });
         }
         const bookingLimit = slotLimitRows[0].booking_limit;
         // /console.log("Booking Count:", bookingCount, "Limit:", bookingLimit);
@@ -545,7 +545,7 @@ export const userFeedbackPCBooking = asyncHandler(async (req, resp) => {
         FROM 
             portable_charger_booking
         WHERE 
-            booking_id = ? AND rider_id = ? AND status IN ('CS', 'PU', 'RO') 
+            booking_id = ? AND rider_id = ? AND status IN ('CC', 'PU', 'RO') 
         LIMIT 1
     `, [booking_id, rider_id]);
 
@@ -635,7 +635,7 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
             [fSlotDate, slot_time]
         );
         if (slotLimitRows.length === 0) {
-            return resp.json({ message: ["Invalid Slot!"], status: 0, code: 422, error: true });
+            return resp.json({ message: ["The slot you selected has is invalid!. Please select another slot"], status: 0, code: 422, error: true });
         }
         const bookingLimit = slotLimitRows[0].booking_limit;
         if (bookingCount >= bookingLimit) {

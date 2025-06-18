@@ -101,8 +101,8 @@ return ResponseData(resp,1, 200, 'Response data fetch successfully!', {data})
 });
 
 export const responseContent = asyncHandler(async (req, resp) => {
- 
-    const module_name = 'pick-drop'
+ const {module_name}=req.query;
+    // const module_name = 'pick-drop'
     const columnMap   = {
         'portable-charger' : 'portable_price',
         'pick-drop'        : 'pick_drop_price',

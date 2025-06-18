@@ -34,9 +34,10 @@ export const getChargingServiceSlotList = asyncHandler(async (req, resp) => {
     });
 });
 
+
 export const requestService = asyncHandler(async (req, resp) => {
     
-    const { rider_id, name, country_code, contact_no, pickup_address, pickup_latitude, pickup_longitude, parking_number='', parking_floor='', vehicle_id, slot_date_time, slot_id, price = 0, order_status = 'PNR', device_name = '', coupon_code='', address_id } = mergeParam(req);
+    const { rider_id, name, country_code, contact_no, pickup_address, pickup_latitude, pickup_longitude, parking_number='', parking_floor='', vehicle_id, slot_date_time, slot_id, price = 0, order_status = 'PNR', device_name= '', coupon_code='', address_id } = mergeParam(req);
 
     const { isValid, errors } = validateFields(mergeParam(req), {
         rider_id         : ["required"],
@@ -60,34 +61,18 @@ export const requestService = asyncHandler(async (req, resp) => {
         const riderAddress = await queryDB(`
             SELECT 
                 landmark, 
-                (SELECT count(id) from riders_vehicles where rider_id =? and vehicle_id = ? ) as vehicle_count,
+                ( SELECT CONCAT( vehicle_make, ', ', vehicle_model, ', ', vehicle_specification, ', ', emirates, '-', 
+                    vehicle_code, '-', vehicle_number ) FROM riders_vehicles WHERE  vehicle_id = ? ) AS vehicle_data,
                 ( SELECT pick_drop_price FROM booking_price LIMIT 1) as booking_price
             FROM 
                 rider_address
             WHERE 
-                rider_id =? and address_id = ? order by id desc
+                rider_id = ? and address_id = ? order by id desc
             LIMIT 1 `,
-        [ rider_id, vehicle_id, rider_id, address_id ]);
-
-       const [vehicleRow] = await db.execute(`
-  SELECT CONCAT(
-    vehicle_make, ', ',
-    vehicle_model, ', ',
-    vehicle_specification, ', ',
-    emirates, '-', 
-    vehicle_code, '-', 
-    vehicle_number
-  ) AS db_vehicle_data
-  FROM riders_vehicles
-  WHERE vehicle_id = ?
-  LIMIT 1
-`, [vehicle_id]);
-
-const vehicle_data = vehicleRow[0]?.db_vehicle_data;
-
+        [ vehicle_id, rider_id, address_id ]);
 
         if(!riderAddress) return resp.json({ message : ["Address Id not valid!"], status: 0, code: 422, error: true });
-        if(riderAddress.vehicle_count == 0) return resp.json({ message : ["Vehicle Id not valid!"], status: 0, code: 422, error: true });
+        if(riderAddress.riders_vehicles == '') return resp.json({ message : ["Vehicle Id not valid!"], status: 0, code: 422, error: true });
     
         const vatAmt       = Math.floor(( parseFloat(riderAddress.booking_price) ) * 5) / 100; 
         const bookingPrice = Math.floor( ( parseFloat(riderAddress.booking_price) + vatAmt ) * 100) ;
@@ -141,7 +126,7 @@ const vehicle_data = vehicleRow[0]?.db_vehicle_data;
             [fSlotDate, slot_time]
         );
         if (slotLimitRows.length === 0) {
-            return resp.json({ message : ["The slot you have selected is invalid!"], status: 0, code: 422, error: true });
+            return resp.json({ message : ["The slot you selected has is invalid!. Please select another slot"], status: 0, code: 422, error: true });
         }
         const bookingLimit = slotLimitRows[0].booking_limit;
 
@@ -150,10 +135,10 @@ const vehicle_data = vehicleRow[0]?.db_vehicle_data;
             return resp.json({ message : ["The slot you have selected is already booked. Please select another slot."], status: 0, code: 422, error: true });
         }
         const insert = await insertRecord('charging_service', [
-            'request_id','vehicle_data', 'rider_id', 'name', 'country_code', 'contact_no', 'vehicle_id', 'slot', 'slot_date_time', 'pickup_address', 'parking_number', 'parking_floor', 
+            'request_id', 'vehicle_data', 'rider_id', 'name', 'country_code', 'contact_no', 'vehicle_id', 'slot', 'slot_date_time', 'pickup_address', 'parking_number', 'parking_floor', 
             'price', 'order_status', 'pickup_latitude', 'pickup_longitude', 'device_name', 'area', 'address_id'
         ], [
-            'CS',vehicle_data, rider_id, name, country_code, contact_no, vehicle_id, slot_id, slotDateTime, pickup_address, parking_number, parking_floor, price, order_status, pickup_latitude, pickup_longitude, device_name, area, address_id
+            'CS', riderAddress.vehicle_data, rider_id, name, country_code, contact_no, vehicle_id, slot_id, slotDateTime, pickup_address, parking_number, parking_floor, price, order_status, pickup_latitude, pickup_longitude, device_name, area, address_id
         ]);
 
         if(insert.affectedRows === 0) return resp.json({status:0, code:200, message : ["Oops! Something went wrong. Please try again."]}); 
@@ -168,7 +153,7 @@ const vehicle_data = vehicleRow[0]?.db_vehicle_data;
             service_id : requestId,
             code       : 200,
         });
-    }catch(err){
+    } catch(err) {
         // await rollbackTransaction(conn);
         console.error("Transaction failed:", err);
         tryCatchErrorHandler(req.originalUrl, err, resp );
@@ -176,6 +161,7 @@ const vehicle_data = vehicleRow[0]?.db_vehicle_data;
         // if (conn) conn.release();
     }
 });
+//end requestService
 
 export const listServices = asyncHandler(async (req, resp) => {
     const {rider_id, page_no, bookingStatus } = mergeParam(req);
@@ -347,7 +333,7 @@ export const cancelValetBooking = asyncHandler(async (req, resp) => {
     }
     var slotDateTime = moment(`${checkOrder.slot_date_time}`).format('YYYY-MM-DD HH:mm:ss');
     let dubaiTime    = new Date().toLocaleString("en-US", { timeZone: "Asia/Dubai" });
-    dubaiTime        = moment(dubaiTime).add(2, 'hours').format('YYYY-MM-DD HH:mm:ss');
+    dubaiTime        = moment(dubaiTime).add(1, 'hours').format('YYYY-MM-DD HH:mm:ss');
 
     if (slotDateTime <= dubaiTime) {
         return resp.json({
@@ -403,7 +389,6 @@ export const cancelValetBooking = asyncHandler(async (req, resp) => {
     return resp.json({ message: ['Booking has been cancelled successfully!'], status: 1, code: 200 });
 });
 
-
 export const userFeedbackValetBooking = asyncHandler(async (req, resp) => {
     const { rider_id, booking_id, description ='', rating } = mergeParam(req);
     const { isValid, errors } = validateFields(mergeParam(req), {
@@ -419,7 +404,7 @@ export const userFeedbackValetBooking = asyncHandler(async (req, resp) => {
         FROM 
             charging_service
         WHERE 
-            request_id = ? AND rider_id = ? AND order_status IN ('WC') 
+            request_id = ? AND rider_id = ? AND order_status IN ('DO', 'WC') 
         LIMIT 1
     `,[booking_id, rider_id]);
 
@@ -460,5 +445,164 @@ export const userFeedbackValetBooking = asyncHandler(async (req, resp) => {
         return resp.json({ message: ['Feedback added successfully!'], status: 1, code: 200 });
     } else {
         return resp.json({ message: ['Feedback already submitted!'], status: 0, code: 200 });
+    }
+});
+
+export const rescheduleService = asyncHandler(async (req, resp) => {
+    
+    const { rider_id, booking_id, slot_date_time, slot_id, device_name = '', } = mergeParam(req);
+
+    const { isValid, errors } = validateFields(mergeParam(req), {
+        rider_id       : ["required"],
+        booking_id     : ["required"],
+        slot_id        : ["required"],
+        slot_date_time : ["required"],
+    });
+    if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
+    
+    try {
+        const fSlotDateTime = moment(slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('YYYY-MM-DD HH:mm:ss');
+        const currDateTime  = moment().utcOffset(4).format('YYYY-MM-DD HH:mm:ss');
+        if (fSlotDateTime < currDateTime) return resp.json({status: 0, code: 422, message: ["Invalid slot, Please select another slot"]});
+        
+        const fSlotDate    = moment(slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('YYYY-MM-DD');
+        const slot_time    = moment(slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('HH:mm:ss');
+        // 1. Lock all bookings for this slot
+        const [lockedRows] = await db.execute(
+            `SELECT
+                id
+            FROM 
+                charging_service
+            WHERE
+                slot_date_time = ? AND order_status NOT IN ("C")
+            FOR UPDATE`,
+            [ fSlotDateTime ]
+        ); //, 'PNR' "WC", 
+        const bookingCount = lockedRows.length;
+
+        // 2. Get slot limit 
+        const [slotLimitRows] = await db.execute( `
+            SELECT
+                booking_limit
+            FROM 
+                pick_drop_slot
+            WHERE
+                slot_date = ? AND start_time = ? LIMIT 1 
+            FOR UPDATE`,
+            [fSlotDate, slot_time]
+        );
+        if (slotLimitRows.length === 0) {
+            return resp.json({ message : ["The slot you selected has is invalid!. Please select another slot"], status: 0, code: 422, error: true });
+        } 
+        const bookingLimit = slotLimitRows[0].booking_limit;
+
+        // 3.  Double-check limit AFTER locking
+        if (bookingCount >= bookingLimit) {
+            return resp.json({ message : ["The slot you have selected is already booked. Please select another slot."], status: 0, code: 422, error: true });
+        }
+        const checkOrder = await queryDB(`
+            SELECT
+                cs.name, cs.country_code, cs.contact_no, cs.pickup_address, cs.pickup_latitude, cs.pickup_longitude,
+                cs.rescheduled_booking, cs.slot_date_time, rd.fcm_token, rd.rider_email, cs.vehicle_data,
+                (select fcm_token from rsa where rsa.rsa_id = cs.rsa_id ) as rsa_fcm_token
+            FROM 
+                charging_service as cs
+            LEFT JOIN
+                riders AS rd ON rd.rider_id = cs.rider_id
+            WHERE 
+                cs.request_id = ? AND cs.rider_id = ?
+            LIMIT 1 `, 
+        [ booking_id, rider_id ]);
+        if (!checkOrder) {
+            return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 404 });
+        }
+        if (checkOrder.rescheduled_booking) {
+            return resp.json({ message: [`This booking has already been rescheduled.`], status: 0, code: 404 });
+        }
+        const oldSlotDateTime = moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss');
+        let prevDay = oldSlotDateTime.subtract(3, 'hours').format('YYYY-MM-DD HH:mm:ss');
+
+        if (currDateTime > prevDay) {
+            return resp.json({
+                message : ["Apologies, rescheduling is only allowed up to 3 hours before the scheduled service time."],
+                status  : 0,
+                code    : 405,
+                error   : true
+            })
+        }
+        const updtFields = {
+            order_status        : 'CNF',
+            slot                : slot_id,
+            slot_date_time      : fSlotDateTime,
+            device_name         : device_name,
+            rescheduled_booking : 1
+        }
+        await updateRecord('charging_service', updtFields, ['request_id', 'rider_id'], [booking_id, rider_id]);
+
+        const insert = await insertRecord('charging_service_history', ['service_id', 'rider_id', 'order_status'], [booking_id, rider_id, 'CNF']); 
+        
+        if (insert.affectedRows == 0) return resp.json({ status: 0, code: 200, message: ["Oops! Something went wrong. Please try again."] });
+        
+        const href    = 'charging_service/' + booking_id;
+        const heading = 'EV Pick Up & Drop Off Rescheduled!';
+        const desc    = `Rescheduled Booking Confirmed! ID: ${booking_id}.`;
+        createNotification(heading, desc, 'Charging Service', 'Rider', 'Admin', '', rider_id, href);
+        createNotification(heading, desc, 'Charging Service', 'Admin', 'Rider', rider_id, '', href);
+        pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
+        
+        const htmlUser = `<html>
+            <body>
+                <h4>Dear  ${checkOrder.name},</h4>
+                <p>We're writing to confirm that your booking for the EV Pickup & Drop-off Service has been successfully rescheduled. Please find the updated details below:</p>
+                
+                Booking ID: ${booking_id}<br>
+                Rescheduled Date & Time : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}<br>
+                <p>Thank you for choosing PlusX Electric. If you have any questions or need further assistance, feel free to contact us. </p>                  
+                <p>Best regards,<br/>PlusX Electric Team</p>
+            </body>
+        </html>`;
+        emailQueue.addEmail(checkOrder.rider_email, `Booking Rescheduled Successfully -${booking_id}`, htmlUser);
+        const formattedDateTime = moment().utcOffset('+04:00').format('DD MMM YYYY hh:mm A');
+        const htmlAdmin = `<html>
+            <body>
+                <h4>Dear Admin,</h4>
+                <p>This is to inform you that a user has rescheduled their EV Pickup and Drop-off Charging Service booking. Please find the updated booking details below:</p>
+                User Name : ${checkOrder.name}<br>
+                User Contact: ${checkOrder.country_code}-${checkOrder.contact_no}<br>
+                Address       : ${checkOrder.address}<br>
+                Booking Time  : ${formattedDateTime}<br> 
+                New Scheduled Date & Time : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}<br> 
+                Location : ${checkOrder.pickup_address}<br> 
+                Vechile Details : ${checkOrder.vehicle_data}<br> 
+                <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a><br>
+                <p>Best regards,<br/>PlusX Electric Team </p>
+            </body>
+        </html>`;
+        emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Pickup & Drop-off Booking Rescheduled - ${booking_id}`, htmlAdmin);
+        
+        /* const href = 'portable_charger_booking/' + booking_id;
+        const heading = 'Portable Charging Rescheduled Booking!';
+        const desc = `Rescheduled Booking Confirmed! ID: ${booking_id}.`;
+        createNotification(heading, desc, 'Portable Charging Booking', 'Rider', 'Admin', '', rider_id, href);
+        createNotification(heading, desc, 'Portable Charging Booking', 'Admin', 'Rider', rider_id, '', href);
+        
+        // Pickup & Drop-off Booking Rescheduled (Booking ID: [XXXX])
+        */
+       if(rsa_id !='' ) pushNotification(checkOrder.rsa_fcm_token, heading, `Pickup & Drop-off Booking Rescheduled (Booking ID: ${booking_id})`, 'RSAFCM', href);
+        
+        let respMsg = "Booking request received! Your booking has been successfully rescheduled. Our team will arrive at the updated time.";
+        
+        // await commitTransaction(conn);
+        return resp.json({
+            message    : [ respMsg ],
+            status     : 1,
+            code       : 200,
+        });
+    } catch(err) {
+        // await rollbackTransaction(conn);
+        console.error("Transaction failed:", err);
+        tryCatchErrorHandler(req.originalUrl, err, resp );
+    } finally {
+        // if (conn) conn.release();
     }
 });

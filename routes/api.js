@@ -35,7 +35,7 @@ import {
     reScheduleBooking, userFeedbackPCBooking
 } from '../controller/api/PortableChargerController.js';
 import { 
-    getChargingServiceSlotList, requestService, listServices, getServiceOrderDetail, getInvoiceList, getInvoiceDetail, cancelValetBooking, userFeedbackValetBooking
+    getChargingServiceSlotList, requestService, listServices, getServiceOrderDetail, getInvoiceList, getInvoiceDetail, cancelValetBooking, userFeedbackValetBooking, rescheduleService
 } from '../controller/api/ChargingServiceController.js';
 
 import { getPaymentSessionData, getPaymentdetails } from '../controller/TestController.js';
@@ -44,7 +44,6 @@ import rateLimit from 'express-rate-limit';
 import { responseContent } from "../controller/api/contentController.js";
 const router = Router();
  router.get('/response-content',apiAuthorization,responseContent);
-
 const limiter = rateLimit({
     windowMs     : 70 * 1000,  //15 * 
     max          : 2,
@@ -183,6 +182,7 @@ const authzAndAuthRoutes = [
     { method: 'get',  path: '/pick-and-drop-invoice-detail', handler: getInvoiceDetail },
     { method: 'post', path: '/charging-service-cancel',      handler: cancelValetBooking },
     { method: 'post', path: '/feedback-charging-service',    handler: userFeedbackValetBooking },
+    { method: 'post', path: '/reschedule-charging-service', handler: rescheduleService },
 
     /* Portable charger */
     { method: 'get',  path: '/portable-charger-list',            handler: chargerList },

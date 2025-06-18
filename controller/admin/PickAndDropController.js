@@ -278,7 +278,7 @@ export const pdSlotList = async (req, resp) => {
         const params = {
             tableName: 'pick_drop_slot',  //cs.slot = pick_drop_slot.slot_id AND  , "PNR"
             columns: `slot_id, start_time, end_time, booking_limit, status, ${formatDateTimeInQuery(['created_at'])},${formatDateInQuery(['slot_date'])}, 
-                (SELECT COUNT(id) FROM charging_service AS cs WHERE DATE(cs.slot_date_time) = pick_drop_slot.slot_date AND TIME(slot_date_time) = pick_drop_slot.start_time AND order_status NOT IN ("WC", "C") ) AS slot_booking_count
+                (SELECT COUNT(id) FROM charging_service AS cs WHERE DATE(cs.slot_date_time) = pick_drop_slot.slot_date AND TIME(slot_date_time) = pick_drop_slot.start_time AND order_status NOT IN ("C") ) AS slot_booking_count
             `,
             sortColumn: 'slot_date DESC, start_time ASC',
             sortOrder: '',
@@ -323,7 +323,7 @@ export const pdSlotDetails = async (req, resp) => {
         const [slotDetails] = await db.execute(`
             SELECT 
                 id, slot_id, start_time, end_time, booking_limit, status, ${formatDateInQuery(['slot_date'])},
-                (SELECT COUNT(id) FROM charging_service AS cs WHERE DATE(cs.slot_date_time) = pick_drop_slot.slot_date AND TIME(slot_date_time) = pick_drop_slot.start_time AND order_status NOT IN ("WC", "C") ) AS slot_booking_count
+                (SELECT COUNT(id) FROM charging_service AS cs WHERE DATE(cs.slot_date_time) = pick_drop_slot.slot_date AND TIME(slot_date_time) = pick_drop_slot.start_time AND order_status NOT IN ("C") ) AS slot_booking_count
             FROM 
                 pick_drop_slot 
             WHERE 

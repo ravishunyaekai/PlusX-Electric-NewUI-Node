@@ -15,6 +15,7 @@ export const rsaLogin = asyncHandler(async (req, resp) => {
     const { isValid, errors } = validateFields(mergeParam(req), {
         mobile: ["required"], password: ["required"], fcm_token: ["required"], latitude: ["required"], longitude: ["required"]
     });
+    console.log("local server")
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
 
     const rsa = await queryDB(`SELECT rsa_name, password, rsa_id, profile_img, status, email, mobile, running_order FROM rsa WHERE mobile=? LIMIT 1`, [mobile]);

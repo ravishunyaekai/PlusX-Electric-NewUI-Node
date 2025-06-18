@@ -83,9 +83,9 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
                     Booking Details:
                     <br>
                     <ul>
-                    <li>Booking ID: ${request_id}</li>
-                    <li>Service Date and Time  : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</li>
-                    <li>Address : ${checkOrder.pickup_address}</li>
+                        <li>Booking ID: ${request_id}</li>
+                        <li>Service Date and Time  : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</li>
+                        <li>Address : ${checkOrder.pickup_address}</li>
                     </ul>
                     <p>We look forward to serving you and providing a seamless EV experience.</p>   
                     <p>Best Regards,<br/> PlusX Electric Team </p>
@@ -99,9 +99,9 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
                 <body>
                     <h4>Dear Admin,</h4>
                     <p>We have received a new booking for our EV Pickup and Drop-Off service. Please find the details below:</p> 
-                    Customer Name  : ${checkOrder.name}<br>
-                    Contact No :${checkOrder.rider_phone}<br>
-                   Address : ${checkOrder.pickup_address}<br>
+                    Customer Name  :  ${checkOrder.name}<br>
+                    Contact No :     ${checkOrder.rider_phone}<br>
+                   Address    :     ${checkOrder.pickup_address}<br>
                     <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a><br>
                    Service Date and Time  : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}<br>
                   Vehicle Details : ${checkOrder.vehicle_data}   <br>
@@ -499,7 +499,6 @@ export const chargerInstallationInvoice = asyncHandler(async (req, resp) => {
         const attachment = {
             filename: `${invoiceId}-invoice.pdf`, path: pdfPath, contentType: 'application/pdf'
         };
-    
         emailQueue.addEmail(email.email, 'Your Charging Installation Booking Invoice - PlusX Electric App', html, attachment);
     }
     
