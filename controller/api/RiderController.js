@@ -367,7 +367,7 @@ export const updateProfile = asyncHandler(async (req, resp) => {
         const rider = await queryDB(`SELECT profile_img FROM riders WHERE rider_id=?`, [riderId]);
 
         if(req.files && req.files['profile_image']) { 
-            console.log('Image hai')
+         
             const oldImagePath = path.join('uploads', 'rider_profile', rider.profile_img || '');
             fs.unlink(oldImagePath, (err) => {
                 if (err) {

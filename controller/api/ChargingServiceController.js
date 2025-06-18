@@ -69,6 +69,23 @@ export const requestService = asyncHandler(async (req, resp) => {
             LIMIT 1 `,
         [ rider_id, vehicle_id, rider_id, address_id ]);
 
+       const [vehicleRow] = await db.execute(`
+  SELECT CONCAT(
+    vehicle_make, ', ',
+    vehicle_model, ', ',
+    vehicle_specification, ', ',
+    emirates, '-', 
+    vehicle_code, '-', 
+    vehicle_number
+  ) AS db_vehicle_data
+  FROM riders_vehicles
+  WHERE vehicle_id = ?
+  LIMIT 1
+`, [vehicle_id]);
+
+const vehicle_data = vehicleRow[0]?.db_vehicle_data;
+
+
         if(!riderAddress) return resp.json({ message : ["Address Id not valid!"], status: 0, code: 422, error: true });
         if(riderAddress.vehicle_count == 0) return resp.json({ message : ["Vehicle Id not valid!"], status: 0, code: 422, error: true });
     
@@ -80,8 +97,9 @@ export const requestService = asyncHandler(async (req, resp) => {
         }
         else if(parseFloat(price) != bookingPrice && coupon_code) {
             const servicePrice = parseFloat(price) ;
-            const couponData   = await checkCoupon(rider_id, 'Valet Charging', coupon_code);
             
+            const couponData   = await checkCoupon(rider_id, 'Valet Charging', coupon_code);
+          
             if(couponData.status == 0 ){
                 return resp.json({ message : [couponData.message], status: 0, code: 422, error: true });
 
@@ -132,10 +150,10 @@ export const requestService = asyncHandler(async (req, resp) => {
             return resp.json({ message : ["The slot you have selected is already booked. Please select another slot."], status: 0, code: 422, error: true });
         }
         const insert = await insertRecord('charging_service', [
-            'request_id', 'rider_id', 'name', 'country_code', 'contact_no', 'vehicle_id', 'slot', 'slot_date_time', 'pickup_address', 'parking_number', 'parking_floor', 
+            'request_id','vehicle_data', 'rider_id', 'name', 'country_code', 'contact_no', 'vehicle_id', 'slot', 'slot_date_time', 'pickup_address', 'parking_number', 'parking_floor', 
             'price', 'order_status', 'pickup_latitude', 'pickup_longitude', 'device_name', 'area', 'address_id'
         ], [
-            'CS', rider_id, name, country_code, contact_no, vehicle_id, slot_id, slotDateTime, pickup_address, parking_number, parking_floor, price, order_status, pickup_latitude, pickup_longitude, device_name, area, address_id
+            'CS',vehicle_data, rider_id, name, country_code, contact_no, vehicle_id, slot_id, slotDateTime, pickup_address, parking_number, parking_floor, price, order_status, pickup_latitude, pickup_longitude, device_name, area, address_id
         ]);
 
         if(insert.affectedRows === 0) return resp.json({status:0, code:200, message : ["Oops! Something went wrong. Please try again."]}); 
@@ -311,7 +329,7 @@ export const cancelValetBooking = asyncHandler(async (req, resp) => {
     
     const checkOrder = await queryDB(`
         SELECT 
-            name, rsa_id, DATE_FORMAT(slot_date_time, '%Y-%m-%d %H:%i:%s') AS slot_date_time,
+            name, vehicle_data,rsa_id,pickup_address, DATE_FORMAT(slot_date_time, '%Y-%m-%d %H:%i:%s') AS slot_date_time,
             CONCAT( country_code, "-", contact_no) as contact_no, 
             (SELECT rd.rider_email FROM riders AS rd WHERE rd.rider_id = cs.rider_id) AS rider_email,
             (SELECT rd.rider_name FROM riders AS rd WHERE rd.rider_id = cs.rider_id) AS rider_name,
@@ -357,30 +375,30 @@ export const cancelValetBooking = asyncHandler(async (req, resp) => {
     const html = `<html>
         <body>
             <h4>Dear ${checkOrder.rider_name},</h4>
-            <p>We would like to inform you that your booking for the EV Pickup and Drop Off charging service has been successfully cancelled. Below are the details of your cancelled booking:</p>
+            <p>We would like to inform you that your booking for the EV Pickup and Drop-Off charging service has been successfully cancelled. Please find the details of your cancelled booking below:</p>
             Booking ID    : ${booking_id}<br>
             Date and Time : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}
             <p>If this cancellation was made in error or if you wish to reschedule, please feel free to reach out to us. We're happy to assist you.</p>
-            <p>Thank you for using PlusX Electric. We hope to serve you again soon.</p>
+            <p>Thank you for using PlusX Electric. We look forward to serving you again soon.</p>
             <p>Best regards,<br/>PlusX Electric Team </p>
         </body>
     </html>`;
-    emailQueue.addEmail(checkOrder.rider_email, `PlusX Electric App: Booking Cancellation`, html);
+    emailQueue.addEmail(checkOrder.rider_email, `PlusX Electric App – Booking Cancellation`, html);
 
     const adminHtml = `<html>
         <body>
             <h4>Dear Admin,</h4>
-            <p>This is to notify you that a customer has canceled their PlusX Electric Pickup and Drop-Off EV Charging Service booking. Please find the details below:</p>
+            <p>This is to inform you that a user has cancelled their booking for the EV Pickup and Drop-Off Service. Please find the booking details below:</p>
             <p>Booking Details:</p>
-            Name         : ${checkOrder.name}<br>
-            Contact      : ${checkOrder.contact_no}<br>
-            Booking ID   : ${booking_id}<br>
-            Booking Date : ${checkOrder.slot_date_time}<br> 
-            Reason       : ${checkOrder.cancel_reason}<br>
-            <p>Thank you,<br/>PlusX Electric Team </p>
+           Customer Name :        ${checkOrder.name}<br>
+            Contact No     : ${checkOrder.contact_no}<br>
+            Address:   ${checkOrder.address}<br>
+           Service Date & Time: ${checkOrder.slot_date_time}<br> 
+            Vehicle Details:${checkOrder.pickup_address}<br>
+            <p>Thank you for your attention to this update.<br/> Best regards,<br>   PlusX Electric Team </p>
         </body>
     </html>`;
-    emailQueue.addEmail(process.env.MAIL_CS_ADMIN, `Pickup & Drop-Off Charging Service : Booking Cancellation `, adminHtml);
+    emailQueue.addEmail(process.env.MAIL_CS_ADMIN, `EV Pickup & Drop-Off Service Booking Cancellation (${booking_id}) `, adminHtml);
 
     return resp.json({ message: ['Booking has been cancelled successfully!'], status: 1, code: 200 });
 });

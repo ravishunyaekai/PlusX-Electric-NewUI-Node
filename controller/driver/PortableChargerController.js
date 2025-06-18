@@ -374,22 +374,8 @@ const chargingComplete = async (req, resp) => {
         const message = `Charging complete, please lock your EV.`;
         await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
         await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
+       
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
-
-        const bookingData = await getTotalAmountFromService(booking_id, 'PCB');
-        const html = `<html>
-                <body>
-                    <h4>Dear ${bookingData.data.rider_name}</h4>
-                    <p>Thank you for choosing PlusX Electric for your Portable EV Charger service. We're pleased to inform you that the service has been successfully completed.</p>
-                    <p>We truly appreciate your trust in us and look forward to serving you again in the future.</p>
-                    <p>Best Regards,<br/>PlusX Electric Team </p>
-                </body>
-            </html>`;
-            // , and the details of your invoice are attached
-            // const attachment = {
-            //     filename: `${invoiceId}-invoice.pdf`, path: pdf.pdfPath, contentType: 'application/pdf'
-            // };        
-        emailQueue.addEmail(bookingData.data.rider_email, 'PlusX Electric: Your Portable EV Charger Service is Now Complete', html);  //, attachment
 
         return resp.json({ message: ['Charging complete. Don’t forget to lock your EV.'], status: 1, code: 200 });
     } else {

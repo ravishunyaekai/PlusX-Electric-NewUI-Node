@@ -481,9 +481,8 @@ export const vehicleBrandList = asyncHandler(async (req, resp) => {
     });
 });
 
-
 export const dubaiAreaList = asyncHandler(async (req, resp) => {
-    const { area_name = "", page=1,} = mergeParam(req);
+    const { area_name = "", page = 1 } = mergeParam(req);
     const pageSize = 20;
 
     const [countRows] = await db.execute(`
@@ -497,28 +496,27 @@ export const dubaiAreaList = asyncHandler(async (req, resp) => {
     const totalCount  = countRows[0].total_count;
     const total_pages = Math.ceil(totalCount / pageSize);
 
-    let query       = "SELECT area_name as area, id from dubai_area where status='1'";
+    let query       = "SELECT area_name as area ,id from dubai_area where status='1'";
     let queryParams = [];
-    
-    if(area_name) {
+ 
+    if( area_name !='' ) {
         query +=' AND area_name like ?'
         queryParams.push(`%${area_name}%`);
     }
     query +=' ORDER BY area_name ASC';
 
-    if(area_name == '' && page != '') {  
+    if( area_name == '' && page != '' ) {  
         const offset = (page - 1) * pageSize;
-        query += ` LIMIT ${offset}, ${pageSize}`;
+        query +=` LIMIT ${offset}, ${pageSize}`;
     }
     const [dataResult] = await db.execute(query, queryParams);
 
     return resp.json({
-        status: 1,
-        code: 200,
-        message: ["Dubai Area List fetched successfully!"],
-        total_pages:total_pages,
-        current_page:page,
-        data: dataResult
-    
+        status       : 1,
+        code         : 200,
+        message      : ["Dubai Area List fetched successfully!"],
+        total_pages  : total_pages,
+        current_page : page,
+        data         : dataResult
     });
 });

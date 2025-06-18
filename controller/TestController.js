@@ -381,8 +381,7 @@ export const rsaBookingConfirm = async (session_id, payment_intent_id) => {
                     <p>Best regards,<br/> PlusX Electric Team </p>
                 </body>
             </html>`;
-            emailQueue.addEmail(checkOrder.rider_email, 'PlusX Electric App: Booking Confirmation for EV Roadside Assistance Service', htmlUser);
-
+            emailQueue.addEmail(checkOrder.rider_email, 'Your Roadside Assistance Booking Confirmation - PlusX Electric App', htmlUser);
             const htmlAdmin = `<html>
                 <body>
                     <h4>Dear Admin,</h4>
@@ -396,8 +395,8 @@ export const rsaBookingConfirm = async (session_id, payment_intent_id) => {
                     <p>Best regards,<br/> PlusX Electric Team </p>
                 </body>
             </html>`;
-            emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `EV Roadside Assistance Booking-${checkOrder.request_id}  `, htmlAdmin);
-           
+            emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Roadside Assistance Booking Confirmation - PlusX Electric App`, htmlAdmin);
+            
             // await commitTransaction(conn);
             return true;
         } else {

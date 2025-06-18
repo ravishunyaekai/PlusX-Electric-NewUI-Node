@@ -330,6 +330,28 @@ const chargingComplete = async (req, resp) => {
         const message = `Charging complete, please lock your EV.`;
         await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
+        // email content goes here
+        const htmlUser = `<html>
+
+                <body>
+
+                    <h4>Dear ${checkOrder.name},</h4>
+                    <p>We hope you're doing well.</p>
+                    <p>Thank you for choosing PlusX Electric for your EV Roadside Assistance service. We’re pleased to inform you that the service has been successfully completed.</p>
+                    <p>We truly appreciate your trust in us and look forward to serving you again.</p>
+                     <p>We look forward to serving you and providing a seamless EV charging experience.</p>
+
+                    <p> Regards,<br/> PlusX Electric App </p>
+
+                </body>
+
+            </html>`;
+
+            emailQueue.addEmail(checkOrder.rider_email, 'PlusX Electric: Your EV Roadside Assistance Service is Now Complete', htmlUser);
+
+           
+        // email content
+
 
         return resp.json({ message: ['Vehicle Charging Completed successfully!'], status: 1, code: 200 });
     } else {

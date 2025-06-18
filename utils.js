@@ -495,7 +495,6 @@ export const checkCoupon = async (rider_id, booking_type, coupon_code) => {
     };
 };
 
-
 // Get Route Map Single or Multiple
 export const getSingleRoute = async (origin, destination) => {
     const apiKey = process.env.Google_map_key;
@@ -544,4 +543,15 @@ export const getMultipleRoute = async (origin, destinations) => {
         }
     });
     return destinations;
+}
+export const  ResponseData=(resp,status, code, message, data = {})=> {
+    if (typeof message === 'string') {
+        message = [message];
+    }
+    return resp.json({
+        status,
+        code,
+        message,
+        ...data
+    });
 }
