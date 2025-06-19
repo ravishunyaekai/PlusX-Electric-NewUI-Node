@@ -75,13 +75,8 @@ export const bookingList = async (req, resp) => {
 export const bookingDetails = async (req, resp) => {
     try {
         const { request_id } = req.body;
-
         if (!request_id) {
-            return resp.status(400).json({
-                status: 0,
-                code: 400,
-                message: 'Booking ID is required.',
-            });
+            return resp.json({ status: 0, code: 400, message: 'Booking ID is required.'});
         }
         const result = await db.execute(`
             SELECT 
@@ -98,15 +93,17 @@ export const bookingDetails = async (req, resp) => {
             [request_id]
         );
         if (result.length === 0) {
-            return resp.status(404).json({
-                status: 0,
-                code: 404,
-                message: 'Booking not found.',
-            });
+            return resp.json({ status: 0, code: 404, message: 'Booking not found.', });
         }
-        const [history] = await db.execute(`SELECT order_status, cancel_by, cancel_reason as reason, ${formatDateTimeInQuery(['created_at'])}, image, 
-            (select rsa.rsa_name from rsa where rsa.rsa_id = charging_service_history.rsa_id) as rsa_name FROM charging_service_history WHERE service_id = ?
-        `, [request_id]);
+        const [history] = await db.execute(`
+            SELECT 
+                order_status, cancel_by, cancel_reason as reason, ${formatDateTimeInQuery(['created_at'])}, image, 
+                (select rsa.rsa_name from RSA WHERE rsa.rsa_id = charging_service_history.rsa_id) as rsa_name 
+            FROM 
+                charging_service_history 
+            WHERE 
+                service_id = ?`, 
+        [request_id]);
 
         const feedBack = await queryDB(`
             SELECT 
@@ -116,22 +113,30 @@ export const bookingDetails = async (req, resp) => {
             WHERE 
                 booking_id = ?
             LIMIT 1`,
-            [request_id]);
+        [request_id]);
 
+        const order_status = history.filter(item => item.order_status === 'CNF');
+        if(order_status.length > 1) {
+
+            const matchingIndexes = history.map((item, index) => item.order_status === 'CNF' ? index : -1).filter(index => index !== -1);
+
+            const lastValue                 = matchingIndexes[matchingIndexes.length - 1];
+            history[lastValue].order_status = 'RPD'
+        }
         return resp.json({
-            status: 1,
-            code: 200,
-            message: ["Pick and Drop booking details fetched successfully!"],
-            data: result[0],
+            status  : 1,
+            code    : 200,
+            message : ["Pick and Drop booking details fetched successfully!"],
+            data    : result[0],
             history,
-            imageUrl: `${req.protocol}://${req.get('host')}/uploads/pick-drop-images/`,
+            imageUrl : `${req.protocol}://${req.get('host')}/uploads/pick-drop-images/`,
             feedBack
         });
     } catch (error) {
-        return resp.status(500).json({
-            status: 0,
-            code: 500,
-            message: 'Error fetching booking details'
+        return resp.json({
+            status  : 0,
+            code    : 500,
+            message : 'Error fetching booking details'
         });
     }
 };

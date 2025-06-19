@@ -34,7 +34,6 @@ export const getChargingServiceSlotList = asyncHandler(async (req, resp) => {
     });
 });
 
-
 export const requestService = asyncHandler(async (req, resp) => {
     
     const { rider_id, name, country_code, contact_no, pickup_address, pickup_latitude, pickup_longitude, parking_number='', parking_floor='', vehicle_id, slot_date_time, slot_id, price = 0, order_status = 'PNR', device_name= '', coupon_code='', address_id } = mergeParam(req);
@@ -49,10 +48,8 @@ export const requestService = asyncHandler(async (req, resp) => {
         pickup_latitude  : ["required"],
         pickup_longitude : ["required"],
         vehicle_id       : ["required"],
-        // parking_number : ["required"],
-        // parking_floor  : ["required"],
-        slot_date_time    : ["required"],
-        address_id        : ["required"],
+        slot_date_time   : ["required"],
+        address_id       : ["required"],
     });
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
     
@@ -130,7 +127,7 @@ export const requestService = asyncHandler(async (req, resp) => {
         }
         const bookingLimit = slotLimitRows[0].booking_limit;
 
-        // 3.  Double-check limit AFTER locking
+        // 3. Double-check limit AFTER locking
         if (bookingCount >= bookingLimit) {
             return resp.json({ message : ["The slot you have selected is already booked. Please select another slot."], status: 0, code: 422, error: true });
         }
@@ -184,12 +181,12 @@ export const listServices = asyncHandler(async (req, resp) => {
     const totalPage = Math.max(Math.ceil(total / limit), 1);
     
     const formatCols = ['slot_date_time', 'created_at'];
-    const servicesQuery = `SELECT request_id, name, country_code, contact_no, slot, ROUND(charging_service.price / 100, 2) AS price, pickup_address, order_status, ${formatDateTimeInQuery(formatCols)} 
+    const servicesQuery = `SELECT request_id, name, country_code, contact_no, slot, ROUND(charging_service.price / 100, 2) AS price, pickup_address, order_status, ${formatDateTimeInQuery(formatCols)}, rescheduled_booking 
     FROM charging_service WHERE rider_id = ? AND ${statusCondition} ${orderBy} LIMIT ${parseInt(start)}, ${parseInt(limit)}
     `;
     const [serviceList] = await db.execute(servicesQuery, [rider_id, ...statusParams]);
 
-    const inProcessQuery = `SELECT request_id, name, country_code, contact_no, slot, ROUND(charging_service.price / 100, 2) AS price, pickup_address, order_status, ${formatDateTimeInQuery(formatCols)} 
+    const inProcessQuery = `SELECT request_id, name, country_code, contact_no, slot, ROUND(charging_service.price / 100, 2) AS price, pickup_address, order_status, ${formatDateTimeInQuery(formatCols)}, rescheduled_booking 
     FROM charging_service WHERE rider_id = ? AND order_status NOT IN ('CNF', 'C', 'WC', 'PNR') ${orderBy} LIMIT ${parseInt(start)}, ${parseInt(limit)} `;
     // const inProcessParams        = ['CNF', 'C', 'WC'];
     const [inProcessBookingList] = await db.execute(inProcessQuery, [rider_id]);
@@ -224,7 +221,7 @@ export const getServiceOrderDetail = asyncHandler(async (req, resp) => {
         LIMIT 1
     `, [service_id]);
     // formatCols.shift();
-    const [history] = await db.execute(`SELECT *, ${formatDateTimeInQuery(formatCols)} FROM charging_service_history WHERE service_id = ?`, [service_id]);
+    const [history] = await db.execute(`SELECT *, ${formatDateTimeInQuery(formatCols)} FROM charging_service_history WHERE service_id = ? order by id ASC`, [service_id]);
 
     if(order){
         order.invoice_url = '';
@@ -235,12 +232,21 @@ export const getServiceOrderDetail = asyncHandler(async (req, resp) => {
         }
     }
     order.slot_date_time = moment(order.slot_date_time ).format('YYYY-MM-DD HH:mm:ss');
+
+    const order_status = history.filter(item => item.order_status === 'CNF');
+    if(order_status.length > 1) {
+
+        const matchingIndexes = history.map((item, index) => item.order_status === 'CNF' ? index : -1).filter(index => index !== -1);
+
+        const lastValue                 = matchingIndexes[matchingIndexes.length - 1];
+        history[lastValue].order_status = 'RPD'
+    }
     return resp.json({
-        message: ["Service Order Details fetched successfully!"],
-        order_data: order,
-        order_history: history,
-        status: 1,
-        code: 200,
+        message       : ["Service Order Details fetched successfully!"],
+        order_data    : order,
+        order_history : history,
+        status        : 1,
+        code          : 200,
     });
 });
 
@@ -358,13 +364,14 @@ export const cancelValetBooking = asyncHandler(async (req, resp) => {
     if( checkOrder.rsa_id) {
         await db.execute(`DELETE FROM charging_service_assign WHERE rider_id=? AND order_id = ?`, [rider_id, booking_id]);
     }
+    //  <p>If this cancellation was made in error or if you wish to reschedule, please feel free to reach out to us. We're happy to assist you.</p>
     const html = `<html>
         <body>
             <h4>Dear ${checkOrder.rider_name},</h4>
             <p>We would like to inform you that your booking for the EV Pickup and Drop-Off charging service has been successfully cancelled. Please find the details of your cancelled booking below:</p>
             Booking ID    : ${booking_id}<br>
             Date and Time : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}
-            <p>If this cancellation was made in error or if you wish to reschedule, please feel free to reach out to us. We're happy to assist you.</p>
+           
             <p>Thank you for using PlusX Electric. We look forward to serving you again soon.</p>
             <p>Best regards,<br/>PlusX Electric Team </p>
         </body>
@@ -376,12 +383,13 @@ export const cancelValetBooking = asyncHandler(async (req, resp) => {
             <h4>Dear Admin,</h4>
             <p>This is to inform you that a user has cancelled their booking for the EV Pickup and Drop-Off Service. Please find the booking details below:</p>
             <p>Booking Details:</p>
-           Customer Name :        ${checkOrder.name}<br>
-            Contact No     : ${checkOrder.contact_no}<br>
+            Customer Name :        ${checkOrder.name}<br>
+            Contact No.     : ${checkOrder.contact_no}<br>
             Address:   ${checkOrder.address}<br>
-           Service Date & Time: ${checkOrder.slot_date_time}<br> 
+            Service Date & Time: ${checkOrder.slot_date_time}<br> 
             Vehicle Details:${checkOrder.pickup_address}<br>
-            <p>Thank you for your attention to this update.<br/> Best regards,<br>   PlusX Electric Team </p>
+            <p>Thank you for your attention to this update.<br/> 
+            Best regards,<br>   PlusX Electric Team </p>
         </body>
     </html>`;
     emailQueue.addEmail(process.env.MAIL_CS_ADMIN, `EV Pickup & Drop-Off Service Booking Cancellation (${booking_id}) `, adminHtml);
@@ -503,7 +511,7 @@ export const rescheduleService = asyncHandler(async (req, resp) => {
         const checkOrder = await queryDB(`
             SELECT
                 cs.name, cs.country_code, cs.contact_no, cs.pickup_address, cs.pickup_latitude, cs.pickup_longitude,
-                cs.rescheduled_booking, cs.slot_date_time, rd.fcm_token, rd.rider_email, cs.vehicle_data,
+                cs.rescheduled_booking, cs.slot_date_time, rd.fcm_token, rd.rider_email, cs.vehicle_data, cs.rsa_id,
                 (select fcm_token from rsa where rsa.rsa_id = cs.rsa_id ) as rsa_fcm_token
             FROM 
                 charging_service as cs
@@ -588,7 +596,7 @@ export const rescheduleService = asyncHandler(async (req, resp) => {
         
         // Pickup & Drop-off Booking Rescheduled (Booking ID: [XXXX])
         */
-       if(rsa_id !='' ) pushNotification(checkOrder.rsa_fcm_token, heading, `Pickup & Drop-off Booking Rescheduled (Booking ID: ${booking_id})`, 'RSAFCM', href);
+       if(checkOrder.rsa_id !='' ) pushNotification(checkOrder.rsa_fcm_token, heading, `Pickup & Drop-off Booking Rescheduled (Booking ID: ${booking_id})`, 'RSAFCM', href);
         
         let respMsg = "Booking request received! Your booking has been successfully rescheduled. Our team will arrive at the updated time.";
         

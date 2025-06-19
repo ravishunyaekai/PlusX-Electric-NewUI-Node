@@ -39,11 +39,14 @@ import {
 } from '../controller/api/ChargingServiceController.js';
 
 import { getPaymentSessionData, getPaymentdetails } from '../controller/TestController.js';
+import { responseContent } from "../controller/api/ContentController.js";
 
 import rateLimit from 'express-rate-limit';
-import { responseContent } from "../controller/api/contentController.js";
+
 const router = Router();
- router.get('/response-content',apiAuthorization,responseContent);
+
+// router.get('/response-content', apiAuthorization, responseContent);
+
 const limiter = rateLimit({
     windowMs     : 70 * 1000,  //15 * 
     max          : 2,
@@ -74,6 +77,7 @@ const authzRoutes = [
     { method: 'post', path: '/vehicle-brand-list',         handler: vehicleBrandList },
     { method: 'post', path: '/vehicle-model-list',         handler: vehicleModelList },
     { method: 'get',  path: '/dubai-area-list',            handler: dubaiAreaList },
+    { method: 'get',  path: '/response-content',           handler: responseContent },
 
     // { method: 'get',  path: '/auto-cancel-booking',          handler: autoCancelBooking },
 ];

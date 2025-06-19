@@ -160,8 +160,7 @@ const portableChargerBookingConfirm = async (session_id, payment_intent_id ) => 
     try { 
         const checkOrder = await queryDB(`
             SELECT pcb.rider_id, pcb.booking_id, pcb.user_name, pcb.country_code, pcb.contact_no, pcb.slot_date, pcb.slot_time, pcb.address, pcb.latitude, pcb.longitude,
-            pcb.service_type, rd.fcm_token, rd.rider_email, 
-            (SELECT CONCAT(vehicle_make, "-", vehicle_model) FROM riders_vehicles as rv WHERE rv.vehicle_id = pcb.vehicle_id ) AS vehicle_data
+            pcb.service_type, rd.fcm_token, rd.rider_email, pcb.vehicle_id, pcb.vehicle_data
             FROM 
                 portable_charger_booking as pcb
             LEFT JOIN
@@ -208,8 +207,20 @@ const portableChargerBookingConfirm = async (session_id, payment_intent_id ) => 
             </html>`;
             emailQueue.addEmail(checkOrder.rider_email, 'PlusX Electric App: Booking Confirmation for Your Portable EV Charger', htmlUser);
 
-            let dubaiTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Dubai" });
-            dubaiTime     = moment(dubaiTime).format('D MMM, YYYY, h:mm A');
+            if(checkOrder.vehicle_data == '' || checkOrder.vehicle_data == null) {
+                const vehicledata = await queryDB(`
+                    SELECT                 
+                        vehicle_make, vehicle_model, vehicle_specification, emirates, vehicle_code, vehicle_number
+                    FROM 
+                        riders_vehicles
+                    WHERE 
+                        rider_id = ? and vehicle_id = ? 
+                    LIMIT 1 `,
+                [ checkOrder.rider_id, checkOrder.vehicle_id ]);
+                if(vehicledata) {
+                    checkOrder.vehicle_data = vehicledata.vehicle_make + ", " + vehicledata.vehicle_model+ ", "+ vehicledata.vehicle_specification+ ", "+ vehicledata.emirates+ "-" + vehicledata.vehicle_code + "-"+ vehicledata.vehicle_number ;
+                }
+            } 
             const htmlAdmin = `<html>
                 <body>
                     <h4>Dear Admin,</h4>
@@ -217,7 +228,6 @@ const portableChargerBookingConfirm = async (session_id, payment_intent_id ) => 
                     Customer Name : ${checkOrder.user_name}<br>
                     Contact No.   : ${checkOrder.country_code}-${checkOrder.contact_no}<br>
                     Address       : ${checkOrder.address}<br>
-                    Booking Time  : ${dubaiTime}<br>                    
                     Service Date & Time : ${moment(checkOrder.slot_date, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(checkOrder.slot_time, 'HH:mm').format('h:mm A')}<br>       
                     Vechile Details : ${checkOrder.vehicle_data}<br> 
                     <a href="https://www.google.com/maps?q=${checkOrder.latitude},${checkOrder.longitude}">Address Link</a><br>
@@ -248,8 +258,7 @@ const pickAndDropBookingConfirm = async (session_id, payment_intent_id) => {
         
         const checkOrder = await queryDB(`
             SELECT 
-                cs.rider_id, cs.request_id, cs.pickup_latitude, cs.pickup_longitude,
-                rd.fcm_token, cs.name, cs.slot_date_time, cs.pickup_address, rd.rider_email
+                cs.rider_id, cs.request_id, cs.pickup_latitude, cs.pickup_longitude, rd.fcm_token, cs.name, cs.slot_date_time, cs.pickup_address, rd.rider_email cs.vehicle_data, cs.vehicle_id 
             FROM 
                 charging_service as cs
             LEFT JOIN

@@ -26,10 +26,10 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
     // const conn = await startTransaction();
     try { 
-        
+
         const checkOrder = await queryDB(`
             SELECT 
-               CONCAT(cs.country_code, ' ', cs.contact_no) AS rider_phone, rd.fcm_token, cs.vehicle_data, cs.name, cs.slot_date_time, cs.pickup_address, cs.pickup_latitude, cs.pickup_longitude, rd.rider_email
+               cs.country_code, cs.contact_no, rd.fcm_token, cs.name, cs.slot_date_time, cs.pickup_address, cs.pickup_latitude, cs.pickup_longitude, rd.rider_email, cs.vehicle_data, cs.vehicle_id 
             FROM 
                 charging_service as cs
             LEFT JOIN
@@ -51,7 +51,7 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
         );
         if (ordHistoryCount.count === 0) { 
             
-            const insert = await insertRecord('charging_service_history', ['service_id', 'rider_id', 'order_status'], [request_id, rider_id, 'CNF']);  //, conn
+            const insert = await insertRecord('charging_service_history', ['service_id', 'rider_id', 'order_status'], [request_id, rider_id, 'CNF']);
             
             if(insert.affectedRows == 0) return resp.json({status:0, code:200, message: ["Oops! Something went wrong. Please try again."]});
 
@@ -66,7 +66,6 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
                 const session = await stripe.checkout.sessions.retrieve(session_id);
                 paymentIntentId = session.payment_intent ;
             }
-         //    console.log("checkOrder.pickup_address",checkOrder.pickup_address,'rider_phone',rider_phone)
             const updt = await updateRecord('charging_service', { order_status : 'CNF', payment_intent_id : paymentIntentId }, ['request_id', 'rider_id'], [request_id, rider_id] );  //, conn
 
             const href    = 'charging_service/' + request_id;
@@ -80,8 +79,7 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
                 <body>
                     <h4>Dear ${checkOrder.name},</h4>
                     <p>Thank you for choosing our EV Pickup and Drop Off service. We are pleased to confirm that your booking has been successfully received.</p>
-                    Booking Details:
-                    <br>
+                    <p>Booking Details: </p>
                     <ul>
                         <li>Booking ID: ${request_id}</li>
                         <li>Service Date and Time  : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</li>
@@ -95,21 +93,35 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
 
             let dubaiTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Dubai" });
             dubaiTime     = moment(dubaiTime).format('D MMM, YYYY, h:mm A');
+
+            if(checkOrder.vehicle_data == '' || checkOrder.vehicle_data == null) {
+                const vehicledata = await queryDB(`
+                    SELECT                 
+                        vehicle_make, vehicle_model, vehicle_specification, emirates, vehicle_code, vehicle_number
+                    FROM 
+                        riders_vehicles
+                    WHERE 
+                        rider_id = ? and vehicle_id = ? 
+                    LIMIT 1 `,
+                [ rider_id, checkOrder.vehicle_id ]);
+                if(vehicledata) {
+                    checkOrder.vehicle_data = vehicledata.vehicle_make + ", " + vehicledata.vehicle_model+ ", "+ vehicledata.vehicle_specification+ ", "+ vehicledata.emirates+ "-" + vehicledata.vehicle_code + "-"+ vehicledata.vehicle_number ;
+                }
+            } 
             const htmlAdmin = `<html>
                 <body>
                     <h4>Dear Admin,</h4>
                     <p>We have received a new booking for our EV Pickup and Drop-Off service. Please find the details below:</p> 
-                    Customer Name  :  ${checkOrder.name}<br>
-                    Contact No :     ${checkOrder.rider_phone}<br>
-                   Address    :     ${checkOrder.pickup_address}<br>
-                    <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a><br>
-                   Service Date and Time  : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}<br>
-                  Vehicle Details : ${checkOrder.vehicle_data}   <br>
-                                   
+                    <p> Customer Name :  ${checkOrder.name}</p>
+                    <p> Contact No    :  ${checkOrder.country_code}-${checkOrder.contact_no}</p>
+                    <p> Address       :  ${checkOrder.pickup_address}</p>
+                    <p>Service Date and Time : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</p>
+                    <p>Vehicle Details : ${checkOrder.vehicle_data} </p>
+                    <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a></p>
                     <p> Best regards,<br/> PlusX Electric Team </p>
                 </body>
             </html>`;
-            emailQueue.addEmail(process.env.MAIL_CS_ADMIN, `EV Pickup and Drop-Off - ${request_id}`, htmlAdmin);
+            emailQueue.addEmail(process.env.MAIL_CS_ADMIN, `Valet Charging Service Booking Received - ${request_id}`, htmlAdmin);
             // await commitTransaction(conn);
             let responseMsg = 'We have received your booking. Our team will get in touch with you soon!';
             return resp.json({ message: [responseMsg], status: 1, code: 200 });
@@ -137,8 +149,7 @@ export const portableChargerInvoice = asyncHandler(async (req, resp) => {
     // const conn = await startTransaction();
     try { 
         const checkOrder = await queryDB(`
-            SELECT pcb.user_name, pcb.country_code, pcb.contact_no, pcb.slot_date, pcb.slot_time, pcb.address, pcb.latitude, pcb.longitude, pcb.service_type, rd.fcm_token, rd.rider_email, 
-            (SELECT CONCAT(vehicle_make, "-", vehicle_model) FROM riders_vehicles as rv WHERE rv.vehicle_id = pcb.vehicle_id ) AS vehicle_data
+            SELECT pcb.user_name, pcb.country_code, pcb.contact_no, pcb.slot_date, pcb.slot_time, pcb.address, pcb.latitude, pcb.longitude, pcb.service_type, rd.fcm_token, rd.rider_email, pcb.vehicle_id, pcb.vehicle_data, 
             FROM 
                 portable_charger_booking as pcb
             LEFT JOIN
@@ -189,9 +200,9 @@ export const portableChargerInvoice = asyncHandler(async (req, resp) => {
                     <h4>Dear ${checkOrder.user_name},</h4>
                     <p>Thank you for choosing our portable charger service for your EV. We are pleased to confirm that your booking has been successfully received.</p> 
                     <p>Booking Details:</p>
-                    Booking ID: ${request_id}<br>
-                    Date and Time of Service: ${moment(checkOrder.slot_date, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(checkOrder.slot_time, 'HH:mm').format('h:mm A')}<br>
-                    <p>We look forward to serving you and providing a seamless EV charging experience.</p>                  
+                    <p>Booking ID: ${request_id}</p>
+                    <p>Date and Time of Service: ${moment(checkOrder.slot_date, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(checkOrder.slot_time, 'HH:mm').format('h:mm A')}</p>
+                    <p>We look forward to serving you and providing a seamless EV charging experience.</p>
                     <p> Best regards,<br/>PlusX Electric Team </p>
                 </body>
             </html>`;
@@ -199,16 +210,30 @@ export const portableChargerInvoice = asyncHandler(async (req, resp) => {
 
             let dubaiTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Dubai" });
             dubaiTime     = moment(dubaiTime).format('D MMM, YYYY, h:mm A');
+
+            if(checkOrder.vehicle_data == '' || checkOrder.vehicle_data == null) {
+                const vehicledata = await queryDB(`
+                    SELECT                 
+                        vehicle_make, vehicle_model, vehicle_specification, emirates, vehicle_code, vehicle_number
+                    FROM 
+                        riders_vehicles
+                    WHERE 
+                        rider_id = ? and vehicle_id = ? 
+                    LIMIT 1 `,
+                [ rider_id, checkOrder.vehicle_id ]);
+                if(vehicledata) {
+                    checkOrder.vehicle_data = vehicledata.vehicle_make + ", " + vehicledata.vehicle_model+ ", "+ vehicledata.vehicle_specification+ ", "+ vehicledata.emirates+ "-" + vehicledata.vehicle_code + "-"+ vehicledata.vehicle_number ;
+                }
+            }
             const htmlAdmin = `<html>
                 <body>
                     <h4>Dear Admin,</h4>
                     <p>We have received a new booking for our Portable Charger service. Please find the details below:</p> 
-                    Customer Name : ${checkOrder.user_name}<br>
-                    Contact No.   : ${checkOrder.country_code}-${checkOrder.contact_no}<br>
-                    Address       : ${checkOrder.address}<br>
-                                     
-                  Service Date & Time : ${moment(checkOrder.slot_date, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(checkOrder.slot_time, 'HH:mm').format('h:mm A')}<br>       
-                    Vechile Details : ${checkOrder.vehicle_data}<br> 
+                    <p>Customer Name : ${checkOrder.user_name}</p>
+                    <p>Contact No.   : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
+                    <p>Address       : ${checkOrder.address}</p>            
+                    <p>Service Date & Time : ${moment(checkOrder.slot_date, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(checkOrder.slot_time, 'HH:mm').format('h:mm A')}</p>       
+                    <p>Vechile Details : ${checkOrder.vehicle_data}</p> 
                     <a href="https://www.google.com/maps?q=${checkOrder.latitude},${checkOrder.longitude}">Address Link</a><br>
                     <p> Best regards,<br/>PlusX Electric Team </p>
                 </body>

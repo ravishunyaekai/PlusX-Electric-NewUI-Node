@@ -328,20 +328,6 @@ const chargingStart = async (req, resp) => {
         await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
         await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
-         const bookingData = await getTotalAmountFromService(booking_id, 'PCB');
-        const html = `<html>
-                <body>
-                    <h4>Dear ${bookingData.data.rider_name}</h4>
-                    <p>Thank you for choosing PlusX Electric for your Portable EV Charger service. We’re pleased to inform you that the service has been successfully completed.</p>
-                    <p>We truly appreciate your trust in us and look forward to serving you again in the future.</p>
-                    <p>Best Regards,<br/>PlusX Electric Team </p>
-                </body>
-            </html>`;
-            // , and the details of your invoice are attached
-            // const attachment = {
-            //     filename: `${invoiceId}-invoice.pdf`, path: pdf.pdfPath, contentType: 'application/pdf'
-            // };        
-        emailQueue.addEmail(bookingData.data.rider_email, 'PlusX Electric: Your Portable EV Charger Service is Now Complete', html);  //, attachment
 
         return resp.json({ message: ['Charging has started. The Pod is now powering your EV!'], status: 1, code: 200 });
     } else {
@@ -350,7 +336,25 @@ const chargingStart = async (req, resp) => {
 };
 const chargingComplete = async (req, resp) => {
     const { booking_id, rsa_id, latitude, longitude } = mergeParam(req);
-    // 
+    
+
+    const checkOrder1 = await queryDB(`
+        SELECT pcba.rider_id, r.fcm_token, r.rider_email, r.rider_name,
+        (SELECT pod_id FROM portable_charger_booking as pcb WHERE pcb.booking_id =? limit 1) AS pod_id
+        FROM 
+            portable_charger_booking_assign pcba
+        LEFT JOIN 
+            riders r ON r.rider_id = pcba.rider_id
+        LEFT JOIN 
+            portable_charger_booking pcb ON pcb.booking_id = pcba.order_id
+        WHERE 
+            pcba.order_id = ? AND pcba.rsa_id = ? AND pcba.status = 1
+        LIMIT 1;
+        
+            `,[booking_id,booking_id, rsa_id]);
+        
+
+
     const checkOrder = await queryDB(`
         SELECT rider_id, 
             (SELECT fcm_token FROM riders WHERE rider_id = portable_charger_booking_assign.rider_id limit 1) AS fcm_token,
@@ -391,7 +395,19 @@ const chargingComplete = async (req, resp) => {
        
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
-        return resp.json({ message: ['Charging complete. Don’t forget to lock your EV.'], status: 1, code: 200 });
+        const html = `<html>
+            <body>
+                <h4>Dear ${checkOrder.rider_name}</h4>
+                <p>Thank you for choosing PlusX Electric for your Portable EV Charger service. We're pleased to inform you that the service has been successfully completed.</p>
+                <p>We truly appreciate your trust in us and look forward to serving you again in the future.</p>
+                <p>Best Regards,<br/>PlusX Electric Team </p>
+            </body>
+        </html>`;
+        emailQueue.addEmail(checkOrder.rider_email, 'PlusX Electric: Your Portable EV Charger Service is Now Complete', html); 
+
+
+
+        return resp.json({ message: [`Charging complete. Don’t forget to lock your EV.`], status: 1, code: 200 });
     } else {
         return resp.json({ message: ['Sorry this is a duplicate entry!'], status: 0, code: 200 });
     }
