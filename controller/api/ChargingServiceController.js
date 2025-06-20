@@ -312,7 +312,7 @@ export const getInvoiceDetail = asyncHandler(async (req, resp) => {
 });
 
 /* User Booking Cancel */
-export const cancelValetBooking = asyncHandler(async (req, resp) => {
+export const oldcancelValetBooking = asyncHandler(async (req, resp) => {
     const { rider_id, booking_id, reason='' } = mergeParam(req);
     const { isValid, errors } = validateFields(mergeParam(req), {rider_id: ["required"], booking_id: ["required"] });
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
@@ -391,6 +391,101 @@ export const cancelValetBooking = asyncHandler(async (req, resp) => {
 
     return resp.json({ message: ['Booking has been cancelled successfully!'], status: 1, code: 200 });
 });
+export const cancelValetBooking = asyncHandler(async (req, resp) => {
+    const { rider_id, booking_id, reason='' } = mergeParam(req);
+    const { isValid, errors } = validateFields(mergeParam(req), {rider_id: ["required"], booking_id: ["required"] });
+    if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
+    
+    // const checkOrder = await queryDB(`
+    //     SELECT 
+    //         name, rsa_id, DATE_FORMAT(slot_date_time, '%Y-%m-%d %H:%i:%s') AS slot_date_time,
+    //         CONCAT( country_code, "-", contact_no) as contact_no, 
+    //         (SELECT rd.rider_email FROM riders AS rd WHERE rd.rider_id = cs.rider_id) AS rider_email,
+    //         (SELECT rd.rider_name FROM riders AS rd WHERE rd.rider_id = cs.rider_id) AS rider_name,
+    //         (SELECT fcm_token FROM riders WHERE rider_id = cs.rider_id) AS fcm_token,
+    //         (select fcm_token from rsa where rsa.rsa_id = cs.rsa_id ) as rsa_fcm_token
+    //     FROM 
+    //         charging_service AS cs
+    //     WHERE 
+    //         request_id = ? AND rider_id = ? AND order_status IN ('CNF','A','ER') 
+    //     LIMIT 1
+    // `,[booking_id, rider_id]);
+    const checkOrder = await queryDB(`
+        SELECT 
+            name,cs.vehicle_data, rsa_id, DATE_FORMAT(slot_date_time, '%Y-%m-%d %H:%i:%s') AS slot_date_time,
+            CONCAT( country_code, "-", contact_no) as contact_no, 
+            (SELECT rd.rider_email FROM riders AS rd WHERE rd.rider_id = cs.rider_id) AS rider_email,
+            (SELECT rd.rider_name FROM riders AS rd WHERE rd.rider_id = cs.rider_id) AS rider_name,
+            (SELECT fcm_token FROM riders WHERE rider_id = cs.rider_id) AS fcm_token,
+            (select fcm_token from rsa where rsa.rsa_id = cs.rsa_id ) as rsa_fcm_token
+        FROM 
+            charging_service AS cs
+        WHERE 
+            request_id = ? AND rider_id = ? AND order_status IN ('CNF','A','ER') 
+        LIMIT 1
+    `,[booking_id, rider_id]);
+
+    if (!checkOrder) {
+        return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 404 });
+    }
+    var slotDateTime = moment(`${checkOrder.slot_date_time}`).format('YYYY-MM-DD HH:mm:ss');
+    let dubaiTime    = new Date().toLocaleString("en-US", { timeZone: "Asia/Dubai" });
+    dubaiTime        = moment(dubaiTime).add(1, 'hours').format('YYYY-MM-DD HH:mm:ss');
+
+    if (slotDateTime <= dubaiTime) {
+        return resp.json({
+            status  : 0,
+            code    : 422,
+            message : ['Please note : Cancellations aren not allowed within 2 hours of the scheduled time.']
+        });
+    }
+    const insert = await db.execute(
+        'INSERT INTO charging_service_history (service_id, rider_id, order_status, rsa_id, cancel_by, cancel_reason) VALUES (?, ?, "C", ?, "User", ?)',
+        [booking_id, rider_id, checkOrder.rsa_id, reason]
+    );
+    if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
+
+    await updateRecord('charging_service', {order_status: 'C'}, ['request_id'], [booking_id]);
+    
+    const href    = `charging_service/${booking_id}`;
+    const title   = 'EV Pick Up & Drop Off Cancel!';
+    const message = `EV Pick Up & Drop Off Charging : Booking ID ${booking_id} - ${checkOrder.rider_name} cancelled the booking.`;
+    await createNotification(title, message, 'Charging Service', 'Admin', 'Rider', rider_id, '', href);
+
+    if( checkOrder.rsa_id) {
+        await db.execute(`DELETE FROM charging_service_assign WHERE rider_id=? AND order_id = ?`, [rider_id, booking_id]);
+    }
+    const html = `<html>
+        <body>
+            <h4>Dear ${checkOrder.rider_name},</h4>
+            <p>We would like to inform you that your booking for the EV Pickup and Drop-Off charging service has been successfully cancelled. Please find the details of your cancelled booking below:</p>
+            <p>Booking ID    : ${booking_id}</p>
+
+            <p>Date and Time : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</p>
+           
+            <p>Thank you for using PlusX Electric. We look forward to serving you again soon.</p>
+            <p>Best regards,<br/>The PlusX Electric App Team</p>
+        </body>
+    </html>`;
+    emailQueue.addEmail(checkOrder.rider_email, `PlusX Electric App - Booking Cancellation`, html);
+
+    const adminHtml = `<html>
+        <body>
+            <h4>Dear Admin,</h4>
+            <p>This is to inform you that a user has cancelled their booking for the EV Pickup and Drop-Off Service. Please find the booking details below:</p>
+            <p>Booking Details:</p>
+            <p>Customer Name  : ${checkOrder.name}</p>
+            <p>Contact No. &nbsp;  :  ${checkOrder.contact_no}</p>
+            <p>Booking ID   : ${booking_id}</p>
+        <p>Service Date & Time : ${checkOrder.slot_date_time}</P> 
+          <p>Vehicle Details:${checkOrder.vehicle_data}</p>>
+            <p>Thank you,<br/>The PlusX Electric App Team</p>
+        </body>
+    </html>`;
+    emailQueue.addEmail(process.env.MAIL_CS_ADMIN, `EV Pickup & Drop-Off Service Booking Cancellation (Booking ID: ${booking_id})`, adminHtml);
+
+    return resp.json({ message: ['Booking has been cancelled successfully!'], status: 1, code: 200 });
+});
 
 export const userFeedbackValetBooking = asyncHandler(async (req, resp) => {
     const { rider_id, booking_id, description ='', rating } = mergeParam(req);
@@ -451,10 +546,12 @@ export const userFeedbackValetBooking = asyncHandler(async (req, resp) => {
     }
 });
 
+
+
 export const rescheduleService = asyncHandler(async (req, resp) => {
     
     const { rider_id, booking_id, slot_date_time, slot_id, device_name = '', } = mergeParam(req);
-
+ 
     const { isValid, errors } = validateFields(mergeParam(req), {
         rider_id       : ["required"],
         booking_id     : ["required"],
@@ -482,7 +579,7 @@ export const rescheduleService = asyncHandler(async (req, resp) => {
             [ fSlotDateTime ]
         ); //, 'PNR' "WC", 
         const bookingCount = lockedRows.length;
-
+ 
         // 2. Get slot limit 
         const [slotLimitRows] = await db.execute( `
             SELECT
@@ -498,7 +595,7 @@ export const rescheduleService = asyncHandler(async (req, resp) => {
             return resp.json({ message : ["The slot you selected has is invalid!. Please select another slot"], status: 0, code: 422, error: true });
         } 
         const bookingLimit = slotLimitRows[0].booking_limit;
-
+ 
         // 3.  Double-check limit AFTER locking
         if (bookingCount >= bookingLimit) {
             return resp.json({ message : ["The slot you have selected is already booked. Please select another slot."], status: 0, code: 422, error: true });
@@ -525,7 +622,7 @@ export const rescheduleService = asyncHandler(async (req, resp) => {
         }
         const oldSlotDateTime = moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss');
         let prevDay = oldSlotDateTime.subtract(3, 'hours').format('YYYY-MM-DD HH:mm:ss');
-
+ 
         if (currDateTime > prevDay) {
             return resp.json({
                 message : ["Apologies, rescheduling is only allowed up to 3 hours before the scheduled service time."],
@@ -542,7 +639,7 @@ export const rescheduleService = asyncHandler(async (req, resp) => {
             rescheduled_booking : 1
         }
         await updateRecord('charging_service', updtFields, ['request_id', 'rider_id'], [booking_id, rider_id]);
-
+ 
         const insert = await insertRecord('charging_service_history', ['service_id', 'rider_id', 'order_status'], [booking_id, rider_id, 'CNF']); 
         
         if (insert.affectedRows == 0) return resp.json({ status: 0, code: 200, message: ["Oops! Something went wrong. Please try again."] });
@@ -554,7 +651,7 @@ export const rescheduleService = asyncHandler(async (req, resp) => {
         createNotification(heading, desc, 'Charging Service', 'Admin', 'Rider', rider_id, '', href);
         pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
         
-        const htmlUser = `<html>
+         const htmlUser = `<html>
             <body>
                 <h4>Dear  ${checkOrder.name},</h4>
                 <p>We're writing to confirm that your booking for the EV Pickup & Drop-off Service has been successfully rescheduled. Please find the updated details below:</p>
@@ -575,9 +672,9 @@ export const rescheduleService = asyncHandler(async (req, resp) => {
                 <p>User Name : ${checkOrder.name}</p>
                 <p>User Contact: ${checkOrder.country_code}-${checkOrder.contact_no}</p>
                 <p>Booking ID  : ${booking_id}</p> 
-                <p>New Scheduled Date & Time : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</p>
-                <p> Address       : ${checkOrder.pickup_address}</p> 
-                <p> Vechile Details : ${checkOrder.vehicle_data}</p> 
+                <p>New Scheduled Date & Time : ${moment(slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}<br> 
+              <p> Address       : ${checkOrder.pickup_address}</p> 
+               <p> Vechile Details : ${checkOrder.vehicle_data}</p> 
                 <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a><br>
                 <p>Best regards,<br/>PlusX Electric Team </p>
             </body>

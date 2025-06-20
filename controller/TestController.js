@@ -201,9 +201,9 @@ const portableChargerBookingConfirm = async (session_id, payment_intent_id ) => 
                     <h4>Dear ${checkOrder.user_name},</h4>
                     <p>Thank you for choosing our portable charger service for your EV. We are pleased to confirm that your booking has been successfully received.</p> 
                     <p>Booking Details:</p>
-                    <p>Booking ID: ${checkOrder.booking_id}</p>
+                    <p> Booking ID: ${checkOrder.booking_id}</>p>
                     <p>Date and Time of Service: ${moment(checkOrder.slot_date, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(checkOrder.slot_time, 'HH:mm').format('h:mm A')}</p>
-                    <p>We look forward to serving you and providing a seamless EV charging experience.</p>
+                    <p>We look forward to serving you and providing a seamless EV charging experience.</p>                  
                     <p> Best regards,<br/>PlusX Electric Team </p>
                 </body>
             </html>`;
@@ -282,11 +282,12 @@ const pickAndDropBookingConfirm = async (session_id, payment_intent_id) => {
                     <h4>Dear ${checkOrder.name},</h4>
                     <p>Thank you for choosing our EV Pickup and Drop Off service. We are pleased to confirm that your booking has been successfully received.</p>
                     <p>Booking Details:</p>
+                   
                     
                     <p>Booking ID: ${checkOrder.request_id}</p>
                     <p>Service Date and Time : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</p>
                     <p>Address : ${checkOrder.pickup_address}</p>
-
+                    
                     <p>We look forward to serving you and providing a seamless EV experience.</p>   
                     <p>Best Regards,<br/> PlusX Electric Team </p>
                 </body>
@@ -359,7 +360,7 @@ const rsaBookingConfirm = async (session_id, payment_intent_id) => {
             const href    = 'road_assistance/' + checkOrder.request_id;
             const heading = 'Roadside Assistance Created';
             // const desc1    = `One Roadside Assistance request has been placed by you with request id: ${checkOrder.request_id} It is also requested that you must reach on the location.`;
-            const desc    = `Booking Confirmed! : ( ${checkOrder.request_id} )`;
+            const desc    = `Booking Confirmed (${checkOrder.request_id}) `;
             createNotification(heading, desc, 'Roadside Assistance', 'Rider', 'Admin','', checkOrder.rider_id, href);
             pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
         

@@ -695,7 +695,7 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
                 <p>Best regards,<br/>PlusX Electric Team </p>
             </body>
         </html>`;
-        emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Portable Charger Booking Rescheduled - (Booking ID : ${booking_id} )`, htmlAdmin);
+        emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Portable Charger Booking Rescheduled (Booking ID :  ${booking_id} )`, htmlAdmin);
         
         let respMsg = "Booking request received! Your booking has been successfully rescheduled. Our team will arrive at the updated time.";
 

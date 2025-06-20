@@ -185,7 +185,7 @@ export const handleFileUploadOld = (
 
       } catch (uploadErr) {
         console.error(' S3 Upload Error:', uploadErr);
-        return res.status(500).json({ status: 0, message: 'Failed to upload to S3.' });
+        return res.status(500).json({ status: 0,image:uploadedUrls, message: 'Failed to upload to S3.' });
       }
     });
   };
