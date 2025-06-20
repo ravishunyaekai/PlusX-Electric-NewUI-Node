@@ -337,24 +337,6 @@ const chargingStart = async (req, resp) => {
 const chargingComplete = async (req, resp) => {
     const { booking_id, rsa_id, latitude, longitude } = mergeParam(req);
     
-
-    const checkOrder1 = await queryDB(`
-        SELECT pcba.rider_id, r.fcm_token, r.rider_email, r.rider_name,
-        (SELECT pod_id FROM portable_charger_booking as pcb WHERE pcb.booking_id =? limit 1) AS pod_id
-        FROM 
-            portable_charger_booking_assign pcba
-        LEFT JOIN 
-            riders r ON r.rider_id = pcba.rider_id
-        LEFT JOIN 
-            portable_charger_booking pcb ON pcb.booking_id = pcba.order_id
-        WHERE 
-            pcba.order_id = ? AND pcba.rsa_id = ? AND pcba.status = 1
-        LIMIT 1;
-        
-            `,[booking_id,booking_id, rsa_id]);
-        
-
-
     const checkOrder = await queryDB(`
         SELECT rider_id, 
             (SELECT fcm_token FROM riders WHERE rider_id = portable_charger_booking_assign.rider_id limit 1) AS fcm_token,
@@ -407,7 +389,7 @@ const chargingComplete = async (req, resp) => {
 
 
 
-        return resp.json({ message: [`Charging complete. Don’t forget to lock your EV.`], status: 1, code: 200 });
+        return resp.json({ message: [`Charging complete. Don't forget to lock your EV.`], status: 1, code: 200 });
     } else {
         return resp.json({ message: ['Sorry this is a duplicate entry!'], status: 0, code: 200 });
     }

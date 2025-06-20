@@ -438,7 +438,7 @@ export const generatePdf = async (templatePath, invoiceData, fileName, savePdfDi
   }
 };
 
-export const checkCoupon = async (rider_id, booking_type, coupon_code) => {
+export const checkCoupon = async (rider_id, booking_type, coupon_code, bookingPrice=0) => {
     
     const [[{ count }]] = await db.execute('SELECT COUNT(*) AS count FROM coupon WHERE coupan_code = ?',[coupon_code]);
     if (count === 0) return { status: 0, code: 422, message : 'The coupon you entered is not valid.' };
@@ -463,12 +463,15 @@ export const checkCoupon = async (rider_id, booking_type, coupon_code) => {
     } else if(coupon.use_count >= coupon.user_per_user){
         return { status: 0, code: 422, message : "This coupon code has already been used the maximum number of times."} ;
     }
-    const priceQry  = `SELECT portable_price, pick_drop_price, roadside_assistance_price, portable_price, pick_drop_price FROM booking_price LIMIT 1`;
-    const priceData = await queryDB(priceQry, []);
+    var amount;
+    if( bookingPrice ) {
+        amount = bookingPrice;
 
-    const amount = (booking_type == 'Valet Charging') ? priceData.pick_drop_price : (booking_type == 'Roadside Assistance') ? priceData.roadside_assistance_price : priceData.portable_price ;
-    
-
+    } else {
+        const priceQry = `SELECT portable_price, pick_drop_price, roadside_assistance_price, portable_price, pick_drop_price FROM booking_price LIMIT 1`;
+        const priceData = await queryDB(priceQry, []);
+        amount = (booking_type == 'Valet Charging') ? priceData.pick_drop_price : priceData.portable_price ;
+    }
     const data = {}; 
     if ( coupon.coupan_percentage != parseFloat(100) ) {
         const dis_price = ( amount  * coupon.coupan_percentage ) /100;
@@ -535,7 +538,7 @@ export const getMultipleRoute = async (origin, destinations) => {
     const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origin}&destinations=${destStr}&key=${apiKey}`;
     const res = await axios.get(url);
 
-    res.data.rows[0].elements.forEach((element, index) => {
+    res.data.rows[0]?.elements.forEach((element, index) => {
 
         if (element.status === 'OK') {
             destinations[index].distance = parseFloat(element.distance.text);

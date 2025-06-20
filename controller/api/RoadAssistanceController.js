@@ -1,5 +1,4 @@
 import multer from 'multer';
-// import moment from "moment";
 import dotenv from 'dotenv';
 import emailQueue from "../../emailQueue.js";
 import validateFields from "../../validation.js";
@@ -23,9 +22,7 @@ const storage = multer.diskStorage({
 export const upload = multer({ storage: storage });
 
 export const addRoadAssistance = asyncHandler(async (req, resp) => {
-    // const { rider_id, name, country_code, contact_no, types_of_issue, pickup_address, drop_address, price, pickup_latitude, pickup_longitude, drop_latitude, drop_longitude, order_status=''} = mergeParam(req);
-
-    const { rider_id, user_name, country_code, contact_no, address, latitude, longitude, vehicle_id, address_id,  parking_number = '', parking_floor = '', service_price = 0, device_name = '', coupon_code=''
+    const { rider_id, user_name, country_code, contact_no, address, latitude, longitude, vehicle_id, address_id, parking_number='', parking_floor ='', service_price= 0, device_name = '', coupon_code='', battery_percent = 0
     } = mergeParam(req);
 
     const { isValid, errors } = validateFields(mergeParam(req), {
@@ -41,34 +38,41 @@ export const addRoadAssistance = asyncHandler(async (req, resp) => {
     });
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
 
-    // const conn = await startTransaction();
     try {
-
         const riderAddress = await queryDB(`
             SELECT 
                 landmark,
                 (SELECT count(id) from riders_vehicles where rider_id =? and vehicle_id = ? ) as vehicle_count,
-                ( SELECT roadside_assistance_price FROM booking_price LIMIT 1) as booking_price
+                ( SELECT roadside_assistance_price FROM booking_price LIMIT 1) as booking_price,
+                (
+                    CASE 
+                        WHEN ? = 0 THEN 
+                            (SELECT rsa_additional_price FROM booking_price LIMIT 1)
+                        ELSE NULL 
+                    END
+                ) AS additional_price
             FROM 
                 rider_address
             WHERE 
                 rider_id =? and address_id = ? order by id desc
             LIMIT 1 `,
-        [ rider_id, vehicle_id, rider_id, address_id ]);
+        [ rider_id, vehicle_id, battery_percent, rider_id, address_id ]);
 
         if(!riderAddress) return resp.json({ message : ["Address Id not valid!"], status: 0, code: 422, error: true });
         if(riderAddress.vehicle_count == 0) return resp.json({ message : ["Vehicle Id not valid!"], status: 0, code: 422, error: true });
 
-        const vatAmt       = Math.floor(( parseFloat(riderAddress.booking_price) ) * 5) / 100; 
-        const bookingPrice = Math.floor( ( parseFloat(riderAddress.booking_price) + vatAmt ) * 100) ;
+        const additional_price = (battery_percent == 0 ) ? parseFloat(riderAddress.additional_price) : 0.0 ;
+        const booking_price    = parseFloat(riderAddress.booking_price) + additional_price 
+        const vatAmt           = Math.floor(( booking_price ) * 5) / 100; 
+        const bookingPrice     = Math.floor( ( parseFloat(booking_price) + parseFloat(vatAmt) ) * 100) ;
 
         if(parseFloat(service_price) != bookingPrice && coupon_code == '') { 
-            return resp.json({ message : ['coupon_code is required'], status: 0, code: 422, error: true });
+            return resp.json({ message : ['Coupon code is required'], status: 0, code: 422, error: true });
         }
         else if(parseFloat(service_price) != bookingPrice && coupon_code) {
             const servicePrice = parseFloat(service_price) ;
-            const couponData   = await checkCoupon(rider_id, 'Roadside Assistance', coupon_code);
-            console.log(couponData)
+            const couponData   = await checkCoupon(rider_id, 'Roadside Assistance', coupon_code, bookingPrice);
+            
             if(couponData.status == 0 ){
                 return resp.json({ message : [couponData.message], status: 0, code: 422, error: true });
 
@@ -76,20 +80,19 @@ export const addRoadAssistance = asyncHandler(async (req, resp) => {
                 return resp.json({ message : ['Booking price is not valid!'], status: 0, code: 422, error: true, bookingPrice, servicePrice, couponprice : couponData.service_price });
             }
         }  
-        // return resp.json({ message : ['Service price Sahi hai!'], status: 1, bookingPrice });
         const area   = riderAddress.landmark;
+        
         const insert = await insertRecord('road_assistance', [
             'request_id', 'rider_id', 'name', 'country_code', 'contact_no', 'address_id', 'pickup_address', 'pickup_latitude', 'pickup_longitude', 'parking_number', 'parking_floor', 'vehicle_id', 'price', 'order_status', 'device_name', 'area'
         ], [
             'RAO', rider_id, user_name, country_code, contact_no, address_id, address, latitude, longitude, parking_number, parking_floor, vehicle_id, service_price, 'PNR', device_name, area
-        ]); //, conn
+        ]);
 
         if(insert.affectedRows === 0) return resp.json({status:0, code:200, message: ['Oops! There is something went wrong! Please Try Again.']});
 
         const requestId = 'RAO' + String(insert.insertId).padStart(4, '0');
         await updateRecord('road_assistance', { request_id : requestId }, ['id'], [insert.insertId] );
 
-        // await commitTransaction(conn);
         return resp.json({
             status     : 1, 
             code       : 200, 
@@ -97,11 +100,10 @@ export const addRoadAssistance = asyncHandler(async (req, resp) => {
             request_id : requestId,
         });
     } catch(err) {
-        // await rollbackTransaction(conn);
         console.error("Transaction failed:", err);
         tryCatchErrorHandler(req.originalUrl, err, resp );
     } finally {
-        // if (conn) conn.release();
+        
     } 
 });
 
@@ -113,27 +115,41 @@ export const roadAssistanceList = asyncHandler(async (req, resp) => {
 
     const limit           = 10;
     const start           = ( page_no * limit ) - limit;
-
+    
     let statusCondition = `order_status IN (?)`;
     let statusParams    = (bookingStatus == 'C' ) ? ['C'] : ['RO'];
     statusParams        = (bookingStatus == 'S' ) ? ['CNF'] : statusParams;
-    const orderBy       = 'ORDER BY id ASC'; //(bookingStatus == 'CM' ) ? 'ORDER BY slot_date ASC, slot_time ASC' : 'ORDER BY id DESC';
+    const orderBy       = 'ORDER BY id ASC';
     
-    const totalQuery = `SELECT COUNT(*) AS total FROM road_assistance WHERE rider_id = ? AND ${statusCondition}`;
-    
+    const totalQuery  = `SELECT COUNT(*) AS total FROM road_assistance WHERE rider_id = ? AND ${statusCondition}`;
     const [totalRows] = await db.execute(totalQuery, [rider_id, ...statusParams]);
     const total       = totalRows[0].total;
     const totalPage   = Math.max(Math.ceil(total / limit), 1);
 
-    const bookingsQuery = `SELECT request_id, ROUND(road_assistance.price/100, 2) AS price, name, country_code, contact_no, order_status, ${formatDateTimeInQuery(['created_at'])}, pickup_address
-        FROM road_assistance WHERE rider_id = ? AND ${statusCondition} ${orderBy} LIMIT ${parseInt(start)}, ${parseInt(limit)}
+    const bookingsQuery = `
+        SELECT 
+            request_id, ROUND(road_assistance.price/100, 2) AS price, name, country_code, contact_no, order_status,
+            ${formatDateTimeInQuery(['created_at'])}, pickup_address
+        FROM 
+            road_assistance 
+        WHERE 
+            rider_id = ? AND ${statusCondition} ${orderBy} 
+        LIMIT 
+            ${parseInt(start)}, ${parseInt(limit)}
     `;
     const [bookingList] = await db.execute(bookingsQuery, [rider_id, ...statusParams]);
 
-    const inProcessQuery = `SELECT request_id, ROUND(road_assistance.price/100, 2) AS price, name, country_code, contact_no, order_status, ${formatDateTimeInQuery(['created_at'])}, pickup_address
-        FROM road_assistance WHERE rider_id = ? AND order_status NOT IN (?, ?, ?, ?, ?) ${orderBy} LIMIT ${parseInt(start)}, ${parseInt(limit)}
+    const inProcessQuery = `
+        SELECT 
+            request_id, ROUND(road_assistance.price/100, 2) AS price, name, country_code, contact_no, order_status, ${formatDateTimeInQuery(['created_at'])}, pickup_address
+        FROM 
+            road_assistance 
+        WHERE 
+            rider_id = ? AND order_status NOT IN (?, ?, ?, ?, ?) ${orderBy} 
+        LIMIT 
+            ${parseInt(start)}, ${parseInt(limit)}
     `;
-    const inProcessParams    = ['CNF', 'C', 'PU', 'RO', 'PNR'];
+    const inProcessParams        = ['CNF', 'C', 'PU', 'RO', 'PNR'];
     const [inProcessBookingList] = await db.execute(inProcessQuery, [rider_id, ...inProcessParams]);
 
     return resp.json({
@@ -144,8 +160,8 @@ export const roadAssistanceList = asyncHandler(async (req, resp) => {
         total_page : totalPage,
         total      : total,
         inProcessBookingList,
-        base_url   : `${req.protocol}://${req.get('host')}/uploads/road-assistance/`, 
-        noResultMsg : 'There are no recent bookings. Please schedule your booking now.'      
+        base_url   : `${req.protocol}://${req.get('host')}/uploads/road-assistance/`,
+        noResultMsg : 'There are no recent bookings. Please schedule your booking now.'
     });
 });
 
@@ -158,7 +174,7 @@ export const roadAssistanceDetail = asyncHandler(async (req, resp) => {
 
     const [roadAssistance] = await db.execute(`
         SELECT 
-            request_id, name, country_code, contact_no, pickup_address, ROUND(road_assistance.price/100, 2) AS price, order_status, 
+            request_id, name, country_code, contact_no, pickup_address, order_status, ROUND(road_assistance.price/100, 2) AS price,
             ${formatDateTimeInQuery(['created_at'])},
             (select concat(rsa_name, ",", country_code, " ", mobile) from rsa where rsa.rsa_id = road_assistance.rsa_id) as rsa_data,
             (select concat(vehicle_make, ", ", vehicle_model, ", ", vehicle_specification, ", ", emirates, "-", vehicle_code, "-", vehicle_number) from riders_vehicles as rv where rv.vehicle_id = road_assistance.vehicle_id limit 1) as vehicle_data
@@ -209,31 +225,28 @@ export const roadAssistanceInvoiceList = asyncHandler(async (req, resp) => {
         whereField.push('payment_status');
         whereValue.push(orderStatus);
     }
-
     const result = await getPaginatedData({
-        tableName: 'road_assistance_invoice',
-        columns: `invoice_id, amount, payment_status, invoice_date, currency,
+        tableName : 'road_assistance_invoice',
+        columns   : `invoice_id, amount, payment_status, invoice_date, currency,
             (select concat(name, ",", country_code, "-", contact_no) from road_assistance as rs where rs.rider_id = road_assistance_invoice.rider_id limit 1) AS riderDetails,
             (select types_of_issue from road_assistance as rs where rs.rider_id = road_assistance_invoice.rider_id limit 1) as types_of_issue
         `,
-        sortColumn: 'id',
-        sortOrder: 'DESC',
+        sortColumn : 'id',
+        sortOrder  : 'DESC',
         page_no,
-        limit: 10,
+        limit     : 10,
         whereField,
         whereValue
     });
-
     return resp.json({
-        status: 1,
-        code: 200,
-        message: ["Road Assistance Invoice List fetch successfully!"],
-        data: result.data,
-        total_page: result.totalPage,
-        total: result.total,
-        base_url: `${req.protocol}://${req.get('host')}/uploads/road-side-invoice/`,
+        status     : 1,
+        code       : 200,
+        message    : ["Road Assistance Invoice List fetch successfully!"],
+        data       : result.data,
+        total_page : result.totalPage,
+        total      : result.total,
+        base_url   : `${req.protocol}://${req.get('host')}/uploads/road-side-invoice/`,
     });
-
 });
 
 export const roadAssistanceInvoiceDetail = asyncHandler(async (req, resp) => {
@@ -253,12 +266,11 @@ export const roadAssistanceInvoiceDetail = asyncHandler(async (req, resp) => {
     `, [invoice_id]);
 
     invoice.invoice_url = `${req.protocol}://${req.get('host')}/public/road-side-invoice/${invoice_id}-invoice.pdf`;
-
     return resp.json({
-        message: ["Road Assistance Invoice Details fetch successfully!"],
-        data: invoice,
-        status: 1,
-        code: 200,
+        message : ["Road Assistance Invoice Details fetch successfully!"],
+        data    : invoice,
+        status  : 1,
+        code    : 200,
     });
 });
 
@@ -273,7 +285,7 @@ export const userFeedbacRSABooking = asyncHandler(async (req, resp) => {
 
     const checkOrder = await queryDB(`
         SELECT 
-            rsa_id, name
+            rsa_id, name 
         FROM 
             road_assistance
         WHERE 
@@ -295,7 +307,7 @@ export const userFeedbacRSABooking = asyncHandler(async (req, resp) => {
             booking_id, rider_id, checkOrder.rsa_id, rating, description
         ]);
         if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
-
+        
         const href    = `road_assistance/${booking_id}`;
         const title   = 'Roadside Assistance Feedback!';
         const message = `Feedback Received - Booking ID: ${booking_id}.`;

@@ -428,16 +428,16 @@ export const userCancelPCBooking = asyncHandler(async (req, resp) => {
  
     const checkOrder = await queryDB(`
         SELECT  
-            pcb.rsa_id, pcb.address, pcb.slot_time, pcb.user_name, DATE_FORMAT(pcb.slot_date, '%Y-%m-%d') AS slot_date, pcb.country_code, pcb.contact_no, riders.rider_email , riders.rider_name, riders.fcm_token, rsa.fcm_token as rsa_fcm_token, pcb.vehicle_data, pcb.vehicle_id,
+            pcb.rsa_id, pcb.address, pcb.slot_time, pcb.user_name, DATE_FORMAT(pcb.slot_date, '%Y-%m-%d') AS slot_date, pcb.country_code, pcb.contact_no, riders.rider_email , riders.rider_name, riders.fcm_token, rsa.fcm_token as rsa_fcm_token, pcb.vehicle_data
         FROM  
             portable_charger_booking pcb
         LEFT JOIN  
             riders on riders.rider_id=pcb.rider_id 
         LEFT JOIN 
-            rsa ON  rsa.rsa_id = pcb.rsa_id 
+            rsa ON rsa.rsa_id = pcb.rsa_id 
         WHERE 
             pcb.booking_id =? AND pcb.rider_id = ? AND pcb.status IN ('CNF', 'A') 
-    `, [booking_id, rider_id]); //vehicle_data
+    `, [booking_id, rider_id]);
  
     if (!checkOrder) {
         return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 404 });
@@ -475,7 +475,7 @@ export const userCancelPCBooking = asyncHandler(async (req, resp) => {
             <h4>Dear ${checkOrder.user_name},</h4>
             <p>We would like to inform you that your booking for the portable charger has been successfully cancelled. Below are the details of your cancelled booking:</p>
             <p>Booking ID    : ${booking_id}</p>
-            <p>BDate and Time : ${moment(checkOrder.slot_date, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(checkOrder.slot_time, 'HH:mm').format('h:mm A')}</p><br>
+            <p>Date and Time : ${moment(checkOrder.slot_date, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(checkOrder.slot_time, 'HH:mm').format('h:mm A')}</p><br>
 
             <p>Thank you for using PlusX Electric. We look forward to serving you again soon.</p>
             <p>Best regards,<br/>PlusX Electric Team </p>
@@ -485,30 +485,16 @@ export const userCancelPCBooking = asyncHandler(async (req, resp) => {
     //  Booking ID    : ${booking_id}</br>
     //  ${reason ? `Cancellation Reason : ${reason}</br>` : ''}
 
-    if(checkOrder.vehicle_data == '' || checkOrder.vehicle_data == null) {
-        const vehicledata = await queryDB(`
-            SELECT                 
-                vehicle_make, vehicle_model, vehicle_specification, emirates, vehicle_code, vehicle_number
-            FROM 
-                riders_vehicles
-            WHERE 
-                rider_id = ? and vehicle_id = ? 
-            LIMIT 1 `,
-        [ rider_id, checkOrder.vehicle_id ]);
-        if(vehicledata) {
-            checkOrder.vehicle_data = vehicledata.vehicle_make + ", " + vehicledata.vehicle_model+ ", "+ vehicledata.vehicle_specification+ ", "+ vehicledata.emirates+ "-" + vehicledata.vehicle_code + "-"+ vehicledata.vehicle_number ;
-        }
-    }
     const adminHtml = `<html>
         <body>
             <h4>Dear Admin,</h4>
             <p>This is to inform you that a user has cancelled their booking for the Portable EV Charging Service. Please find the details below:</p>
             <p>Booking Details:</p>
-            Customer Name       : ${checkOrder.user_name}</br>
-            Contact No          : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
-            Address             : ${checkOrder.address}</br>
-            Service Date & Time : ${checkOrder.slot_date} - ${checkOrder.slot_time}</br> 
-            Vehicle Details     : ${checkOrder.vehicle_data}</br>
+            <p>Customer Name       : ${checkOrder.user_name}</p>
+            <p>Contact No          : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
+            <p>Address             : ${checkOrder.address}</p>
+            <p>Service Date & Time : ${checkOrder.slot_date} - ${checkOrder.slot_time}</p> 
+            <p>Vehicle Details     : ${checkOrder.vehicle_data}</p><br>
             <p>Thank you for your attention to this update.</p>
             <p>Best regards,<br/>PlusX Electric Team </p>
         </body>
@@ -709,7 +695,7 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
                 <p>Best regards,<br/>PlusX Electric Team </p>
             </body>
         </html>`;
-        emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Portable Charger Booking Rescheduled - ${booking_id}`, htmlAdmin);
+        emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Portable Charger Booking Rescheduled - (Booking ID : ${booking_id} )`, htmlAdmin);
         
         let respMsg = "Booking request received! Your booking has been successfully rescheduled. Our team will arrive at the updated time.";
 

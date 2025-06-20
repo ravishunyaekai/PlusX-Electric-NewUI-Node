@@ -11,7 +11,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 
-export const RavisirhandleFileUpload = (dirName, fileFields, requiredFields = [], maxFiles = 10, allowedFileTypes = ['png', 'jpeg', 'jpg']) => {
+export const handleFileUpload = (dirName, fileFields, requiredFields = [], maxFiles = 10, allowedFileTypes = ['png', 'jpeg', 'jpg']) => {
     const destinationPath = path.join('uploads', dirName);
     let errorMsg = {};
 
@@ -107,7 +107,7 @@ const uploadFileToS3 = async (file, dirName = 'default') => {
   return data.Location;
 };
 
-export const handleFileUpload = (
+export const handleFileUploadOld = (
   dirName,
   fileFields,
   requiredFields = [],

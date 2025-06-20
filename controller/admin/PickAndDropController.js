@@ -17,7 +17,7 @@ export const bookingList = async (req, resp) => {
 
         const params = {
             tableName : 'charging_service',
-            columns   : `request_id, rider_id, name, order_status, ROUND(price/100, 2) AS price, ${formatDateTimeInQuery(['created_at'])},
+            columns   : `request_id, rider_id, name, order_status, ROUND(price/100, 2) AS price, ${formatDateTimeInQuery(['created_at'])}, rescheduled_booking,
             (select rsa_name from rsa where rsa.rsa_id = charging_service.rsa_id) as rsa_name`,
             sortColumn : 'created_at',
             sortOrder  : 'DESC',
@@ -84,7 +84,7 @@ export const bookingDetails = async (req, resp) => {
                 cs.parking_number, cs.parking_floor, cs.pickup_latitude, cs.pickup_longitude, 
                 (select concat(rsa_name, ",", country_code, "-", mobile) from rsa where rsa.rsa_id = cs.rsa_id) as rsa_data,
                 (select concat(vehicle_make, "-", vehicle_model) from riders_vehicles as rv where rv.vehicle_id = cs.vehicle_id) as vehicle_data,
-                DATE_FORMAT(cs.slot_date_time, '%Y-%m-%d %H:%i:%s') AS slot_date_time,
+                DATE_FORMAT(cs.slot_date_time, '%Y-%m-%d %H:%i:%s') AS slot_date_time, 
                 ${formatDateTimeInQuery(['cs.created_at'])}
             FROM 
                 charging_service cs
@@ -98,7 +98,7 @@ export const bookingDetails = async (req, resp) => {
         const [history] = await db.execute(`
             SELECT 
                 order_status, cancel_by, cancel_reason as reason, ${formatDateTimeInQuery(['created_at'])}, image, 
-                (select rsa.rsa_name from RSA WHERE rsa.rsa_id = charging_service_history.rsa_id) as rsa_name 
+                (select rsa.rsa_name from rsa WHERE rsa.rsa_id = charging_service_history.rsa_id) as rsa_name
             FROM 
                 charging_service_history 
             WHERE 
@@ -133,6 +133,7 @@ export const bookingDetails = async (req, resp) => {
             feedBack
         });
     } catch (error) {
+        console.log(error)
         return resp.json({
             status  : 0,
             code    : 500,

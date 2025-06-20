@@ -83,7 +83,7 @@ export const register = asyncHandler(async (req, resp) => {
         LIMIT 1
     `, [ rider_email, rider_mobile, mobile ]);
     const err = [];
-    if(isExist.check_mob > 0 || isExist.rsa_mob > 0 ) return resp.json({ status:0, code:422, message: ['Mobile number is already registered.'] });
+    if(isExist.check_mob > 0 || isExist.rsa_mob > 0 ) return resp.json({ status:0, code:422, message: ['The provided number already exists.'] });
     if(isExist.check_email > 0 ) return resp.json({ status:0, code:422, message: ['Email already registered.'] }); 
     
     const rider = await insertRecord('riders', [
@@ -290,14 +290,14 @@ export const home = asyncHandler(async (req, resp) => {
     };
     const orderData = await queryDB(
         `SELECT request_id, (SELECT CONCAT(rsa_name, ',', country_code, ' ', mobile) FROM rsa WHERE rsa_id = road_assistance.rsa_id) AS rsaDetails, created_at 
-        FROM road_assistance WHERE rider_id = ? AND order_status NOT IN ('PNR', 'CNF', 'A', 'PU', 'C', 'RO') ORDER BY id DESC LIMIT 1
+        FROM road_assistance WHERE rider_id = ? AND order_status NOT IN ('PNR', 'CNF', 'A', 'PU', 'C', 'RO', 'CC') ORDER BY id DESC LIMIT 1
     `, [rider_id]);
     
     if (orderData) orderData.eta_time = '12 Min.';
     
     const pickDropData = await queryDB(
         `SELECT request_id, (SELECT CONCAT(rsa_name, ',', country_code, ' ', mobile) FROM rsa WHERE rsa_id = charging_service.rsa_id) AS rsaDetails, created_at 
-        FROM charging_service WHERE rider_id = ? AND order_status NOT IN ('CNF', 'A', 'WC', 'C', 'PNR') ORDER BY id DESC LIMIT 1
+        FROM charging_service WHERE rider_id = ? AND order_status NOT IN ('CNF', 'A', 'WC', 'C', 'PNR', 'DO') ORDER BY id DESC LIMIT 1
     `, [rider_id]);
     
     if (pickDropData) pickDropData.eta_time = '11 Min.';
@@ -326,6 +326,7 @@ export const home = asyncHandler(async (req, resp) => {
         code                      : 200
     });
 });
+
 
 export const getRiderData = asyncHandler(async(req, resp) => {
     const {rider_id} = mergeParam(req);

@@ -7,7 +7,7 @@ import emailQueue from "../../emailQueue.js";
 import validateFields from "../../validation.js";
 import { insertRecord, queryDB, getPaginatedData, updateRecord } from '../../dbUtils.js';
 import db from "../../config/db.js";
-import { createNotification, mergeParam, formatDateTimeInQuery, asyncHandler, formatDateInQuery, checkCoupon } from "../../utils.js";
+import { createNotification, mergeParam, pushNotification, formatDateTimeInQuery, asyncHandler, formatDateInQuery, checkCoupon } from "../../utils.js";
 dotenv.config();
 
 import { tryCatchErrorHandler } from "../../middleware/errorHandler.js";
@@ -158,7 +158,7 @@ export const requestService = asyncHandler(async (req, resp) => {
         // if (conn) conn.release();
     }
 });
-//end requestService
+//end 
 
 export const listServices = asyncHandler(async (req, resp) => {
     const {rider_id, page_no, bookingStatus } = mergeParam(req);
@@ -168,11 +168,9 @@ export const listServices = asyncHandler(async (req, resp) => {
     const limit = 10;
     const start = (page_no[0] * limit) - limit;
 
-    // const statusCondition = (history && history == 1) ? `order_status IN (?, ?)` : `order_status NOT IN (?, ?)`;
-    // const statusParams = ['WC', 'C'];
-    let statusCondition = `order_status IN (?)`;
-    let statusParams    =  (bookingStatus == 'C' ) ? ['C'] : ['WC'];
-    statusParams        =  (bookingStatus == 'S' ) ? ['CNF'] : statusParams;
+    let statusCondition = (bookingStatus == 'CM' ) ? `order_status IN (?, ?)` : `order_status IN (?)`; 
+    let statusParams    = (bookingStatus == 'C' ) ? ['C'] : ['WC', 'DO'];
+    statusParams        = (bookingStatus == 'S' ) ? ['CNF'] : statusParams;
     const orderBy       = 'ORDER BY id ASC'; //(bookingStatus == 'CM' ) ? 'ORDER BY slot_date_time ASC' : 'ORDER BY id DESC';
 
     const totalQuery = `SELECT COUNT(*) AS total FROM charging_service WHERE rider_id = ? AND ${statusCondition}`;
@@ -187,7 +185,7 @@ export const listServices = asyncHandler(async (req, resp) => {
     const [serviceList] = await db.execute(servicesQuery, [rider_id, ...statusParams]);
 
     const inProcessQuery = `SELECT request_id, name, country_code, contact_no, slot, ROUND(charging_service.price / 100, 2) AS price, pickup_address, order_status, ${formatDateTimeInQuery(formatCols)}, rescheduled_booking 
-    FROM charging_service WHERE rider_id = ? AND order_status NOT IN ('CNF', 'C', 'WC', 'PNR') ${orderBy} LIMIT ${parseInt(start)}, ${parseInt(limit)} `;
+    FROM charging_service WHERE rider_id = ? AND order_status NOT IN ('CNF', 'C', 'WC', 'PNR', 'DO') ${orderBy} LIMIT ${parseInt(start)}, ${parseInt(limit)} `;
     // const inProcessParams        = ['CNF', 'C', 'WC'];
     const [inProcessBookingList] = await db.execute(inProcessQuery, [rider_id]);
     // console.log(inProcessQuery);
@@ -212,12 +210,12 @@ export const getServiceOrderDetail = asyncHandler(async (req, resp) => {
     
     const order = await queryDB(`
         SELECT 
-            charging_service.*, 
-            ROUND(charging_service.price / 100, 2) AS price, 
-            (select concat(vehicle_make, ", ", vehicle_model, ", ", vehicle_specification, ", ", emirates, "-", vehicle_code, "-", vehicle_number) from riders_vehicles as rv where rv.vehicle_id = charging_service.vehicle_id limit 1) as vehicle_data,
+            charging_service.*, ROUND(charging_service.price / 100, 2) AS price,
             ${formatDateTimeInQuery(formatCols)} 
-        FROM charging_service 
-        WHERE request_id = ? 
+        FROM 
+            charging_service 
+        WHERE 
+            request_id = ? 
         LIMIT 1
     `, [service_id]);
     // formatCols.shift();
@@ -321,16 +319,16 @@ export const cancelValetBooking = asyncHandler(async (req, resp) => {
     
     const checkOrder = await queryDB(`
         SELECT 
-            name, vehicle_data,rsa_id,pickup_address, DATE_FORMAT(slot_date_time, '%Y-%m-%d %H:%i:%s') AS slot_date_time,
-            CONCAT( country_code, "-", contact_no) as contact_no, 
-            (SELECT rd.rider_email FROM riders AS rd WHERE rd.rider_id = cs.rider_id) AS rider_email,
-            (SELECT rd.rider_name FROM riders AS rd WHERE rd.rider_id = cs.rider_id) AS rider_name,
-            (SELECT fcm_token FROM riders WHERE rider_id = cs.rider_id) AS fcm_token,
-            (select fcm_token from rsa where rsa.rsa_id = cs.rsa_id ) as rsa_fcm_token
+            cs.name, cs.vehicle_data, cs.rsa_id, DATE_FORMAT(slot_date_time, '%Y-%m-%d %H:%i:%s') AS slot_date_time,
+            cs.country_code, cs.contact_no, rd.rider_email, rd.rider_name, rd.fcm_token, rsa.fcm_token as rsa_fcm_token
         FROM 
             charging_service AS cs
+        LEFT JOIN  
+            riders on riders.rider_id = cs.rider_id 
+        LEFT JOIN 
+            rsa ON rsa.rsa_id = cs.rsa_id 
         WHERE 
-            request_id = ? AND rider_id = ? AND order_status IN ('CNF','A','ER') 
+            request_id = ? AND rider_id = ? AND order_status IN ('CNF', 'A', 'ER') 
         LIMIT 1
     `,[booking_id, rider_id]);
 
@@ -364,32 +362,29 @@ export const cancelValetBooking = asyncHandler(async (req, resp) => {
     if( checkOrder.rsa_id) {
         await db.execute(`DELETE FROM charging_service_assign WHERE rider_id=? AND order_id = ?`, [rider_id, booking_id]);
     }
-    //  <p>If this cancellation was made in error or if you wish to reschedule, please feel free to reach out to us. We're happy to assist you.</p>
     const html = `<html>
         <body>
             <h4>Dear ${checkOrder.rider_name},</h4>
             <p>We would like to inform you that your booking for the EV Pickup and Drop-Off charging service has been successfully cancelled. Please find the details of your cancelled booking below:</p>
-            Booking ID    : ${booking_id}<br>
-            Date and Time : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}
-           
+            <p>Booking ID    : ${booking_id}</p>
+            <p>Date and Time : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')} </p>
             <p>Thank you for using PlusX Electric. We look forward to serving you again soon.</p>
             <p>Best regards,<br/>PlusX Electric Team </p>
         </body>
     </html>`;
-    emailQueue.addEmail(checkOrder.rider_email, `PlusX Electric App – Booking Cancellation`, html);
+    emailQueue.addEmail(checkOrder.rider_email, `PlusX Electric App - Booking Cancellation`, html);
 
     const adminHtml = `<html>
         <body>
             <h4>Dear Admin,</h4>
             <p>This is to inform you that a user has cancelled their booking for the EV Pickup and Drop-Off Service. Please find the booking details below:</p>
             <p>Booking Details:</p>
-            Customer Name :        ${checkOrder.name}<br>
-            Contact No.     : ${checkOrder.contact_no}<br>
-            Address:   ${checkOrder.address}<br>
-            Service Date & Time: ${checkOrder.slot_date_time}<br> 
-            Vehicle Details:${checkOrder.pickup_address}<br>
-            <p>Thank you for your attention to this update.<br/> 
-            Best regards,<br>   PlusX Electric Team </p>
+            <p>Customer Name : ${checkOrder.name}</p>
+            <p>Contact No.   :  ${checkOrder.country_code}-${checkOrder.contact_no}</p>
+            <p>Booking ID    : ${booking_id}</p>
+            <p>Service Date & Time : ${checkOrder.slot_date_time}</P> 
+            <p>Vehicle Details     : ${checkOrder.vehicle_data}</p>>
+            <p>Thank you,<br/>The PlusX Electric App Team</p>
         </body>
     </html>`;
     emailQueue.addEmail(process.env.MAIL_CS_ADMIN, `EV Pickup & Drop-Off Service Booking Cancellation (${booking_id}) `, adminHtml);
@@ -508,6 +503,7 @@ export const rescheduleService = asyncHandler(async (req, resp) => {
         if (bookingCount >= bookingLimit) {
             return resp.json({ message : ["The slot you have selected is already booked. Please select another slot."], status: 0, code: 422, error: true });
         }
+        
         const checkOrder = await queryDB(`
             SELECT
                 cs.name, cs.country_code, cs.contact_no, cs.pickup_address, cs.pickup_latitude, cs.pickup_longitude,
@@ -563,39 +559,32 @@ export const rescheduleService = asyncHandler(async (req, resp) => {
                 <h4>Dear  ${checkOrder.name},</h4>
                 <p>We're writing to confirm that your booking for the EV Pickup & Drop-off Service has been successfully rescheduled. Please find the updated details below:</p>
                 
-                Booking ID: ${booking_id}<br>
-                Rescheduled Date & Time : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}<br>
+                <p>Booking ID: ${booking_id}</p>
+                <p>Rescheduled Date & Time : ${moment(slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</p>
                 <p>Thank you for choosing PlusX Electric. If you have any questions or need further assistance, feel free to contact us. </p>                  
                 <p>Best regards,<br/>PlusX Electric Team</p>
             </body>
         </html>`;
-        emailQueue.addEmail(checkOrder.rider_email, `Booking Rescheduled Successfully -${booking_id}`, htmlUser);
-        const formattedDateTime = moment().utcOffset('+04:00').format('DD MMM YYYY hh:mm A');
+        emailQueue.addEmail(checkOrder.rider_email, `Booking Rescheduled Successfully - ${booking_id}`, htmlUser);
+        // const formattedDateTime = moment().utcOffset('+04:00').format('DD MMM YYYY hh:mm A');
+
         const htmlAdmin = `<html>
             <body>
                 <h4>Dear Admin,</h4>
                 <p>This is to inform you that a user has rescheduled their EV Pickup and Drop-off Charging Service booking. Please find the updated booking details below:</p>
-                User Name : ${checkOrder.name}<br>
-                User Contact: ${checkOrder.country_code}-${checkOrder.contact_no}<br>
-                Address       : ${checkOrder.address}<br>
-                Booking Time  : ${formattedDateTime}<br> 
-                New Scheduled Date & Time : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}<br> 
-                Location : ${checkOrder.pickup_address}<br> 
-                Vechile Details : ${checkOrder.vehicle_data}<br> 
+                <p>User Name : ${checkOrder.name}</p>
+                <p>User Contact: ${checkOrder.country_code}-${checkOrder.contact_no}</p>
+                <p>Booking ID  : ${booking_id}</p> 
+                <p>New Scheduled Date & Time : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</p>
+                <p> Address       : ${checkOrder.pickup_address}</p> 
+                <p> Vechile Details : ${checkOrder.vehicle_data}</p> 
                 <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a><br>
                 <p>Best regards,<br/>PlusX Electric Team </p>
             </body>
         </html>`;
-        emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Pickup & Drop-off Booking Rescheduled - ${booking_id}`, htmlAdmin);
+    
+        emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Pickup & Drop-off Booking Rescheduled (Booking ID : ${booking_id})`, htmlAdmin);
         
-        /* const href = 'portable_charger_booking/' + booking_id;
-        const heading = 'Portable Charging Rescheduled Booking!';
-        const desc = `Rescheduled Booking Confirmed! ID: ${booking_id}.`;
-        createNotification(heading, desc, 'Portable Charging Booking', 'Rider', 'Admin', '', rider_id, href);
-        createNotification(heading, desc, 'Portable Charging Booking', 'Admin', 'Rider', rider_id, '', href);
-        
-        // Pickup & Drop-off Booking Rescheduled (Booking ID: [XXXX])
-        */
        if(checkOrder.rsa_id !='' ) pushNotification(checkOrder.rsa_fcm_token, heading, `Pickup & Drop-off Booking Rescheduled (Booking ID: ${booking_id})`, 'RSAFCM', href);
         
         let respMsg = "Booking request received! Your booking has been successfully rescheduled. Our team will arrive at the updated time.";

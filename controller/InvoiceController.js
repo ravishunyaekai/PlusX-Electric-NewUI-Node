@@ -18,7 +18,7 @@ const __dirname  = path.dirname(__filename);
 
 export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
     const {rider_id, request_id, payment_intent_id ='', coupon_code ='', session_id='' } = mergeParam(req);
-
+ 
     const { isValid, errors } = validateFields(mergeParam(req), {
         rider_id   : ["required"], 
         request_id : ["required"], 
@@ -26,10 +26,10 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
     // const conn = await startTransaction();
     try { 
-
+        
         const checkOrder = await queryDB(`
             SELECT 
-               cs.country_code, cs.contact_no, rd.fcm_token, cs.name, cs.slot_date_time, cs.pickup_address, cs.pickup_latitude, cs.pickup_longitude, rd.rider_email, cs.vehicle_data, cs.vehicle_id 
+                cs.name, cs.country_code, cs.contact_no, rd.rider_email, rd.fcm_token, cs.slot_date_time, cs.pickup_address, cs.pickup_latitude, cs.pickup_longitude, cs.vehicle_data 
             FROM 
                 charging_service as cs
             LEFT JOIN
@@ -38,7 +38,7 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
                 cs.request_id = ? AND cs.rider_id = ? AND cs.order_status = 'PNR'
             LIMIT 1
         `,[request_id, rider_id]);
-
+ 
         if (!checkOrder) {
             return resp.json({ 
                 message : [`We have received your booking. Our team will get in touch with you soon!`], 
@@ -54,74 +54,59 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
             const insert = await insertRecord('charging_service_history', ['service_id', 'rider_id', 'order_status'], [request_id, rider_id, 'CNF']);
             
             if(insert.affectedRows == 0) return resp.json({status:0, code:200, message: ["Oops! Something went wrong. Please try again."]});
-
+ 
             if(coupon_code){
                 const coupon = await queryDB(`SELECT coupan_percentage FROM coupon WHERE coupan_code = ? LIMIT 1 `, [ coupon_code ]); 
         
                 let coupan_percentage = coupon.coupan_percentage ;
-                await insertRecord('coupon_usage', ['coupan_code', 'user_id', 'booking_id', 'coupan_percentage'], [coupon_code, rider_id, request_id, coupan_percentage]);  //, conn
+                await insertRecord('coupon_usage', ['coupan_code', 'user_id', 'booking_id', 'coupan_percentage'], [coupon_code, rider_id, request_id, coupan_percentage]);
             }
             let paymentIntentId = payment_intent_id;
             if(session_id){
                 const session = await stripe.checkout.sessions.retrieve(session_id);
                 paymentIntentId = session.payment_intent ;
             }
-            const updt = await updateRecord('charging_service', { order_status : 'CNF', payment_intent_id : paymentIntentId }, ['request_id', 'rider_id'], [request_id, rider_id] );  //, conn
-
+            const updt = await updateRecord('charging_service', { order_status : 'CNF', payment_intent_id : paymentIntentId }, ['request_id', 'rider_id'], [request_id, rider_id] );
+ 
             const href    = 'charging_service/' + request_id;
             const heading = 'EV Pick Up & Drop Off Booking!';
             const desc    = `Booking Confirmed! ID: ${request_id}.`;
             createNotification(heading, desc, 'Charging Service', 'Rider', 'Admin','', rider_id, href);
             createNotification(heading, desc, 'Charging Service', 'Admin', 'Rider', rider_id, '', href);
             pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
-   
-            const htmlUser = `<html>
+        
+           const htmlUser = `<html>
                 <body>
                     <h4>Dear ${checkOrder.name},</h4>
                     <p>Thank you for choosing our EV Pickup and Drop Off service. We are pleased to confirm that your booking has been successfully received.</p>
-                    <p>Booking Details: </p>
-                    <ul>
-                        <li>Booking ID: ${request_id}</li>
-                        <li>Service Date and Time  : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</li>
-                        <li>Address : ${checkOrder.pickup_address}</li>
-                    </ul>
+                    <p>Booking Details:</p>
+                    
+                    <p>Booking ID: ${request_id}</p>
+                    <p>Service Date and Time : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</p>
+                    <p>Address : ${checkOrder.pickup_address}</p>
+                    
                     <p>We look forward to serving you and providing a seamless EV experience.</p>   
                     <p>Best Regards,<br/> PlusX Electric Team </p>
                 </body>
             </html>`;
             emailQueue.addEmail(checkOrder.rider_email, 'PlusX Electric App: Booking Confirmation for Your EV Pickup and Drop Off Service', htmlUser);
-
-            let dubaiTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Dubai" });
-            dubaiTime     = moment(dubaiTime).format('D MMM, YYYY, h:mm A');
-
-            if(checkOrder.vehicle_data == '' || checkOrder.vehicle_data == null) {
-                const vehicledata = await queryDB(`
-                    SELECT                 
-                        vehicle_make, vehicle_model, vehicle_specification, emirates, vehicle_code, vehicle_number
-                    FROM 
-                        riders_vehicles
-                    WHERE 
-                        rider_id = ? and vehicle_id = ? 
-                    LIMIT 1 `,
-                [ rider_id, checkOrder.vehicle_id ]);
-                if(vehicledata) {
-                    checkOrder.vehicle_data = vehicledata.vehicle_make + ", " + vehicledata.vehicle_model+ ", "+ vehicledata.vehicle_specification+ ", "+ vehicledata.emirates+ "-" + vehicledata.vehicle_code + "-"+ vehicledata.vehicle_number ;
-                }
-            } 
+ 
             const htmlAdmin = `<html>
                 <body>
                     <h4>Dear Admin,</h4>
                     <p>We have received a new booking for our EV Pickup and Drop-Off service. Please find the details below:</p> 
-                    <p> Customer Name :  ${checkOrder.name}</p>
-                    <p> Contact No    :  ${checkOrder.country_code}-${checkOrder.contact_no}</p>
-                    <p> Address       :  ${checkOrder.pickup_address}</p>
+                    <p>Customer Name  : ${checkOrder.name}</p>
+                    <p>Contact No. : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
+                    <p>Address     : ${checkOrder.pickup_address}</p>
                     <p>Service Date and Time : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</p>
-                    <p>Vehicle Details : ${checkOrder.vehicle_data} </p>
-                    <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a></p>
+                    <p>Vehicle Details: ${checkOrder.vehicle_data}  </p>
+                
+                    <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a><br>               
                     <p> Best regards,<br/> PlusX Electric Team </p>
                 </body>
             </html>`;
-            emailQueue.addEmail(process.env.MAIL_CS_ADMIN, `Valet Charging Service Booking Received - ${request_id}`, htmlAdmin);
+            emailQueue.addEmail(process.env.MAIL_CS_ADMIN, `EV Pickup and Drop-Off - ${request_id}`, htmlAdmin);
+ 
             // await commitTransaction(conn);
             let responseMsg = 'We have received your booking. Our team will get in touch with you soon!';
             return resp.json({ message: [responseMsg], status: 1, code: 200 });
@@ -149,7 +134,8 @@ export const portableChargerInvoice = asyncHandler(async (req, resp) => {
     // const conn = await startTransaction();
     try { 
         const checkOrder = await queryDB(`
-            SELECT pcb.user_name, pcb.country_code, pcb.contact_no, pcb.slot_date, pcb.slot_time, pcb.address, pcb.latitude, pcb.longitude, pcb.service_type, rd.fcm_token, rd.rider_email, pcb.vehicle_id, pcb.vehicle_data, 
+            SELECT 
+                pcb.user_name, pcb.country_code, pcb.contact_no, pcb.slot_date, pcb.slot_time, pcb.address, pcb.latitude, pcb.longitude, pcb.service_type, rd.fcm_token, rd.rider_email, pcb.vehicle_data 
             FROM 
                 portable_charger_booking as pcb
             LEFT JOIN
@@ -211,20 +197,6 @@ export const portableChargerInvoice = asyncHandler(async (req, resp) => {
             let dubaiTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Dubai" });
             dubaiTime     = moment(dubaiTime).format('D MMM, YYYY, h:mm A');
 
-            if(checkOrder.vehicle_data == '' || checkOrder.vehicle_data == null) {
-                const vehicledata = await queryDB(`
-                    SELECT                 
-                        vehicle_make, vehicle_model, vehicle_specification, emirates, vehicle_code, vehicle_number
-                    FROM 
-                        riders_vehicles
-                    WHERE 
-                        rider_id = ? and vehicle_id = ? 
-                    LIMIT 1 `,
-                [ rider_id, checkOrder.vehicle_id ]);
-                if(vehicledata) {
-                    checkOrder.vehicle_data = vehicledata.vehicle_make + ", " + vehicledata.vehicle_model+ ", "+ vehicledata.vehicle_specification+ ", "+ vehicledata.emirates+ "-" + vehicledata.vehicle_code + "-"+ vehicledata.vehicle_number ;
-                }
-            }
             const htmlAdmin = `<html>
                 <body>
                     <h4>Dear Admin,</h4>
@@ -312,7 +284,7 @@ export const rsaInvoice = asyncHandler(async (req, resp) => {
 
             const href    = 'road_assistance/' + request_id;
             const heading = 'EV Roadside Assistance Booking!';
-            const desc    = `Booking Confirmed! ID: ${request_id}`;
+            const desc    = `Booking Confirmed! : ( ${request_id} )`;
             createNotification(heading, desc, 'Roadside Assistance', 'Rider', 'Admin','', rider_id, href);
             createNotification(heading, desc, 'Roadside Assistance', 'Admin', 'Rider', rider_id, '', href);
             pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
@@ -332,15 +304,14 @@ export const rsaInvoice = asyncHandler(async (req, resp) => {
                     <p>Best regards,<br/> PlusX Electric Team </p>
                 </body>
             </html>`;
-            emailQueue.addEmail(checkOrder.rider_email, 'PlusX Electric App: Booking Confirmation for EV Roadside Assistance Service ', htmlUser);
+            emailQueue.addEmail(checkOrder.rider_email, 'PlusX Electric App: Booking Confirmation for EV Roadside Assistance Service', htmlUser);
             const htmlAdmin = `<html>
                 <body>
                     <h4>Dear Admin,</h4>
                     <p>We have received a new booking for the EV Roadside Assistance service. Please find the details below:</p>
-                    <P>Please find the details below:</p>
                     <p>Customer Name   : ${checkOrder.name}</p>
-                    <p>Contact No.  : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
-                    <p>Address  : ${checkOrder.pickup_address}</p>
+                    <p>Contact No.     : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
+                    <p>Address         : ${checkOrder.pickup_address}</p>
                     <p>Vechile Details : ${checkOrder.vehicle_data}</p>
                     <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a><br>           
                     <p>Best regards,<br/> PlusX Electric Team </p>

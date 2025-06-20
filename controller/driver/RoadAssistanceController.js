@@ -17,6 +17,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
+
 /* RSA - Booking Action */
 export const getRsaOrderStage = asyncHandler(async (req, resp) => {
     const {rsa_id, booking_id } = mergeParam(req);
@@ -132,7 +133,7 @@ const acceptBooking = async (req, resp) => {
             order_id = ? AND rsa_id = ? AND status = 0
         LIMIT 1
     `,[booking_id, rsa_id]);
-
+    // console.log(checkOrder);
     if (!checkOrder) {
         return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 422 });
     }
@@ -264,7 +265,9 @@ const chargingStart = async (req, resp) => {
     const ordHistoryCount = await queryDB(
         'SELECT COUNT(*) as count FROM order_history WHERE rsa_id = ? AND order_status = "CS" AND order_id = ?',[rsa_id, booking_id]
     );
+    
     if (ordHistoryCount.count === 0) {
+        
         const podBatteryData = await getPodBatteryData(pod_id);
         const podData        = podBatteryData.data.length > 0 ? JSON.stringify(podBatteryData.data) : null;
         const sumOfLevel     = podBatteryData.sum ?  podBatteryData.sum : '';
@@ -273,7 +276,6 @@ const chargingStart = async (req, resp) => {
             'INSERT INTO order_history (order_id, rider_id, order_status, rsa_id, latitude, longitude, pod_data, image, remarks) VALUES (?, ?, "CS", ?, ?, ?, ?, ?, ?)',
             [booking_id, checkOrder.rider_id, rsa_id, latitude, longitude, podData, images, remark]
         );
-        // console.log('insert', checkOrder)
         if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
 
         await updateRecord('road_assistance', {order_status: 'CS', rsa_id, pod_id, start_charging_level: sumOfLevel }, ['request_id'], [booking_id] );
@@ -422,10 +424,9 @@ const chargerPickedUp = async (req, resp) => {
             // };
             emailQueue.addEmail(bookingData.data.rider_email, 'PlusX Electric: Your EV Roadside Assistance Service is Now Complete', html);  //, attachment
         // }
-        // console.log('RRAAA')
         await rsaInvoice(checkOrder.rider_id, booking_id); 
         
-        return resp.json({ message: [' Charger picked-up successfully!'], status: 1, code: 200 });
+        return resp.json({ message: ['Charger picked-up successfully!'], status: 1, code: 200 });
     } else {
         return resp.json({ message: ['Sorry this is a duplicate entry!'], status: 0, code: 200 });
     }
@@ -441,7 +442,7 @@ const reachedOffice = async (req, resp) => {
         WHERE 
             order_id = ? AND rsa_id = ? AND status = 1
         LIMIT 1
-    `,[booking_id, rsa_id]);  //request_id
+    `,[booking_id, rsa_id]);
 
     if (!checkOrder) {
         return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 404 });

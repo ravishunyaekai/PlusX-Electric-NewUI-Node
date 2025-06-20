@@ -806,32 +806,22 @@ export const subscriptionList = asyncHandler(async (req, resp) => {
         whereValues.push(start, end);
         whereOperators.push('>=', '<=');
     }
-
     const result = await getPaginatedData({
-        tableName: 'portable_charger_subscriptions',
-        // columns: `subscription_id, amount, expiry_date, booking_limit, total_booking, payment_date,
-        //     (select concat(rider_name, ",", country_code, "-", rider_mobile) from riders as r where r.rider_id = portable_charger_subscriptions.rider_id) as riderDetails
-        // `,
-        columns: `
-        subscription_id, 
-        amount, 
-        expiry_date, 
-        booking_limit, 
-        total_booking, 
-        payment_date,
-        (SELECT rider_name FROM riders AS r WHERE r.rider_id = portable_charger_subscriptions.rider_id LIMIT 1) AS rider_name,
-        (SELECT country_code FROM riders AS r WHERE r.rider_id = portable_charger_subscriptions.rider_id LIMIT 1) AS country_code,
-        (SELECT rider_mobile FROM riders AS r WHERE r.rider_id = portable_charger_subscriptions.rider_id LIMIT 1) AS rider_mobile
-    `,
-        sortColumn: 'id',
-        sortOrder: 'DESC',
-        liveSearchFields: ['subscription_id'],
-        liveSearchTexts: [search_text],
+        tableName : 'portable_charger_subscriptions',
+        columns   : `subscription_id, amount, expiry_date, booking_limit, total_booking, payment_date,
+            (SELECT rider_name FROM riders AS r WHERE r.rider_id = portable_charger_subscriptions.rider_id LIMIT 1) AS rider_name,
+            (SELECT country_code FROM riders AS r WHERE r.rider_id = portable_charger_subscriptions.rider_id LIMIT 1) AS country_code,
+            (SELECT rider_mobile FROM riders AS r WHERE r.rider_id = portable_charger_subscriptions.rider_id LIMIT 1) AS rider_mobile
+        `,
+        sortColumn       : 'id',
+        sortOrder        : 'DESC',
+        liveSearchFields : ['subscription_id'],
+        liveSearchTexts  : [search_text],
         page_no,
-        limit: 10,
-        whereField: whereFields,
-        whereValue: whereValues,
-        whereOperator: whereOperators
+        limit         : 10,
+        whereField    : whereFields,
+        whereValue    : whereValues,
+        whereOperator : whereOperators
     });
 
     return resp.json({
@@ -850,23 +840,15 @@ export const subscriptionDetail = asyncHandler(async (req, resp) => {
 
     const subscription = await queryDB(`
         SELECT 
-          pcs.subscription_id, 
-          pcs.amount, 
-          pcs.expiry_date, 
-          pcs.booking_limit, 
-          pcs.total_booking, 
-          pcs.payment_date,
-          r.rider_name,
-          r.country_code,
-          r.rider_mobile,
-          ${formatDateTimeInQuery(['pcs.created_at'])}
+            pcs.subscription_id, pcs.amount, pcs.expiry_date, pcs.booking_limit, pcs.total_booking, pcs.payment_date,
+            r.rider_name, r.country_code, r.rider_mobile, ${formatDateTimeInQuery(['pcs.created_at'])}
         FROM 
-          portable_charger_subscriptions pcs
+            portable_charger_subscriptions pcs
         JOIN 
-          riders r ON r.rider_id = pcs.rider_id
+            riders r ON r.rider_id = pcs.rider_id
         WHERE 
-          pcs.subscription_id = ?
-    `, [subscription_id]);
+            pcs.subscription_id = ? `, 
+    [subscription_id]);
       
 
     return resp.json({status: 1, code: 200, data: subscription, message: "Subscription Detail fetch successfully!"});
@@ -963,8 +945,8 @@ export const customerChargerBookingList = async (req, resp) => {
         if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
 
         const params = {
-            tableName: 'portable_charger_booking',
-            columns: `booking_id, rider_id, rsa_id, charger_id, vehicle_id, service_name, service_price, service_type, user_name, country_code, contact_no, status, rescheduled_booking, 
+            tableName : 'portable_charger_booking',
+            columns   : `booking_id, rider_id, rsa_id, charger_id, vehicle_id, service_name, service_price, service_type, user_name, country_code, contact_no, status, rescheduled_booking, 
             (select rsa_name from rsa where rsa.rsa_id = portable_charger_booking.rsa_id) as rsa_name, 
                 ${formatDateInQuery(['slot_date'])}, concat(slot_date, " ", slot_time) as slot_time, ${formatDateTimeInQuery(['created_at'])}`,
             sortColumn : 'slot_date',
@@ -973,9 +955,9 @@ export const customerChargerBookingList = async (req, resp) => {
             limit: 10,
             liveSearchFields : ['booking_id', 'user_name', 'service_name'],
             liveSearchTexts  : [search_text, search_text, search_text],
-            whereField      : ['rider_id', 'status'],
-            whereValue      : [customerId, 'PNR'],
-            whereOperator   : ['=', "!="]
+            whereField       : ['rider_id', 'status'],
+            whereValue       : [customerId, 'PNR'],
+            whereOperator    : ['=', "!="]
         };
         if (start_date && end_date) {
             
