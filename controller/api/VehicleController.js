@@ -33,7 +33,7 @@ export const vehicleList = asyncHandler(async (req, resp) => {
         data: result.data,
         total_page: result.totalPage,
         total: result.total,
-        base_url: `${req.protocol}://${req.get('host')}/uploads/vehicle-image/`
+        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/vehicle-image/`
     });
 });
 
@@ -53,7 +53,7 @@ export const vehicleDetail = asyncHandler(async (req, resp) => {
         message: ["Charging Station Details fetched successfully!"],
         data: vehicleData,
         gallery_data: imgName,
-        base_url: `${req.protocol}://${req.get('host')}/uploads/vehicle-image/`,
+        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/vehicle-image/`,
     });
 
 });
@@ -182,7 +182,7 @@ export const allSellVehicleList = asyncHandler(async (req, resp) => {
         total_page: result.totalPage,
         status: 1,
         code: 200,
-        image_path: `${req.protocol}://${req.get('host')}/uploads/vehicle-image/`
+        image_path: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/vehicle-image/`
     });
 
 });
@@ -213,7 +213,7 @@ export const sellVehicleList = asyncHandler(async (req, resp) => {
         total_page: result.totalPage,
         status: 1,
         code: 200,
-        image_path: `${req.protocol}://${req.get('host')}/uploads/vehicle-image/`
+        image_path: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/vehicle-image/`
     });
 
 });
@@ -247,7 +247,7 @@ export const sellVehicleDetail = asyncHandler(async (req, resp) => {
         code: 200,
         message: ["Charging Station Details fetched successfully!"],
         sale_data: data,
-        image_path: `${req.protocol}://${req.get('host')}/uploads/vehicle-image/`,
+        image_path: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/vehicle-image/`,
     });
 
 });

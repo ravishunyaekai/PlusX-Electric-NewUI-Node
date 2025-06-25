@@ -69,7 +69,7 @@ export const requestService = asyncHandler(async (req, resp) => {
         [ vehicle_id, rider_id, address_id ]);
 
         if(!riderAddress) return resp.json({ message : ["Address Id not valid!"], status: 0, code: 422, error: true });
-        if(riderAddress.riders_vehicles == '') return resp.json({ message : ["Vehicle Id not valid!"], status: 0, code: 422, error: true });
+        if(riderAddress.vehicle_data == '') return resp.json({ message : ["Vehicle Id not valid!"], status: 0, code: 422, error: true });
     
         const vatAmt       = Math.floor(( parseFloat(riderAddress.booking_price) ) * 5) / 100; 
         const bookingPrice = Math.floor( ( parseFloat(riderAddress.booking_price) + vatAmt ) * 100) ;
@@ -206,7 +206,7 @@ export const getServiceOrderDetail = asyncHandler(async (req, resp) => {
     const { isValid, errors } = validateFields(mergeParam(req), {rider_id: ["required"], service_id: ["required"]});
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
 
-    const formatCols = ['created_at', 'updated_at']; // 'slot_date_time', 
+    const formatCols = ['created_at', 'updated_at'];
     
     const order = await queryDB(`
         SELECT 
@@ -224,10 +224,10 @@ export const getServiceOrderDetail = asyncHandler(async (req, resp) => {
     if(order){
         order.invoice_url = '';
         order.slot = 'Schedule';
-        if (order.order_status == 'WC') {
-            const invoiceId = order.request_id.replace('CS', 'INVCS');
-            order.invoice_url = `${req.protocol}://${req.get('host')}/public/pick-drop-invoice/${invoiceId}-invoice.pdf`;
-        }
+        // if (order.order_status == 'WC') {
+        //     const invoiceId = order.request_id.replace('CS', 'INVCS');
+        //     order.invoice_url = `https://plusx.s3.ap-south-1.amazonaws.com/public/pick-drop-invoice/${invoiceId}-invoice.pdf`;
+        // }
     }
     order.slot_date_time = moment(order.slot_date_time ).format('YYYY-MM-DD HH:mm:ss');
 
@@ -276,14 +276,14 @@ export const getInvoiceList = asyncHandler(async (req, resp) => {
     });
 
     return resp.json({
-        status: 1,
-        code: 200,
-        message: ["Pick & Drop Invoice List fetch successfully!"],
-        data: result.data,
-        total_page: result.totalPage,
-        total: result.total,
-        base_url: `${req.protocol}://${req.get('host')}/uploads/pick-drop-invoice/`,
-    });
+        status     : 1,
+        code       : 200,
+        message    : ["Pick & Drop Invoice List fetch successfully!"],
+        data       : result.data,
+        total_page : result.totalPage,
+        total      : result.total,
+        base_url   : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/pick-drop-invoice/`,  
+    }); ////https://plusx.s3.ap-south-1.amazonaws.com
 });
 export const getInvoiceDetail = asyncHandler(async (req, resp) => {
     const {rider_id, invoice_id } = mergeParam(req);
@@ -301,7 +301,7 @@ export const getInvoiceDetail = asyncHandler(async (req, resp) => {
             csi.invoice_id = ?
     `, [invoice_id]);
 
-    invoice.invoice_url = `${req.protocol}://${req.get('host')}/public/pick-drop-invoice/${invoice_id}-invoice.pdf`;
+    invoice.invoice_url = `https://plusx.s3.ap-south-1.amazonaws.com/public/pick-drop-invoice/${invoice_id}-invoice.pdf`;
 
     return resp.json({
         message: ["Pick & Drop Invoice Details fetch successfully!"],
@@ -324,11 +324,11 @@ export const cancelValetBooking = asyncHandler(async (req, resp) => {
         FROM 
             charging_service AS cs
         LEFT JOIN  
-            riders on riders.rider_id = cs.rider_id 
+            riders as rd on rd.rider_id = cs.rider_id
         LEFT JOIN 
             rsa ON rsa.rsa_id = cs.rsa_id 
         WHERE 
-            request_id = ? AND rider_id = ? AND order_status IN ('CNF', 'A', 'ER') 
+            cs.request_id = ? AND cs.rider_id = ? AND order_status IN ('CNF', 'A', 'ER') 
         LIMIT 1
     `,[booking_id, rider_id]);
 
@@ -378,16 +378,17 @@ export const cancelValetBooking = asyncHandler(async (req, resp) => {
         <body>
             <h4>Dear Admin,</h4>
             <p>This is to inform you that a user has cancelled their booking for the EV Pickup and Drop-Off Service. Please find the booking details below:</p>
-            <p>Booking Details:</p>
-            <p>Customer Name : ${checkOrder.name}</p>
-            <p>Contact No.   :  ${checkOrder.country_code}-${checkOrder.contact_no}</p>
-            <p>Booking ID    : ${booking_id}</p>
+            <p>Booking Details : </p>
+            <p>Customer Name       : ${checkOrder.name}</p>
+            <p>Contact No.         : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
+            <p>Booking ID          : ${booking_id}</p>
             <p>Service Date & Time : ${checkOrder.slot_date_time}</P> 
-            <p>Vehicle Details     : ${checkOrder.vehicle_data}</p>>
-            <p>Thank you,<br/>The PlusX Electric App Team</p>
+            <p>Vehicle Details     : ${checkOrder.vehicle_data}</p>
+            <p>Thank you for your attention to this update.</p>
+            <p>Best regards,<br/>PlusX Electric Team </p>
         </body>
     </html>`;
-    emailQueue.addEmail(process.env.MAIL_CS_ADMIN, `EV Pickup & Drop-Off Service Booking Cancellation (${booking_id}) `, adminHtml);
+    emailQueue.addEmail(process.env.MAIL_CS_ADMIN, `EV Pickup & Drop-Off Service Booking Cancellation ( Booking ID : ${booking_id} ) `, adminHtml);
 
     return resp.json({ message: ['Booking has been cancelled successfully!'], status: 1, code: 200 });
 });
@@ -575,9 +576,9 @@ export const rescheduleService = asyncHandler(async (req, resp) => {
                 <p>User Name : ${checkOrder.name}</p>
                 <p>User Contact: ${checkOrder.country_code}-${checkOrder.contact_no}</p>
                 <p>Booking ID  : ${booking_id}</p> 
-                <p>New Scheduled Date & Time : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</p>
-                <p> Address       : ${checkOrder.pickup_address}</p> 
-                <p> Vechile Details : ${checkOrder.vehicle_data}</p> 
+                <p>New Scheduled Date & Time : ${moment(slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</p>
+                <p> Location        : ${checkOrder.pickup_address}</p> 
+                <p> Vechile Details : ${checkOrder.vehicle_data}</p>
                 <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a><br>
                 <p>Best regards,<br/>PlusX Electric Team </p>
             </body>

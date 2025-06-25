@@ -26,7 +26,6 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
     // const conn = await startTransaction();
     try { 
-        
         const checkOrder = await queryDB(`
             SELECT 
                 cs.name, cs.country_code, cs.contact_no, rd.rider_email, rd.fcm_token, cs.slot_date_time, cs.pickup_address, cs.pickup_latitude, cs.pickup_longitude, cs.vehicle_data 
@@ -63,7 +62,7 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
             }
             let paymentIntentId = payment_intent_id;
             if(session_id){
-                const session = await stripe.checkout.sessions.retrieve(session_id);
+                const session   = await stripe.checkout.sessions.retrieve(session_id);
                 paymentIntentId = session.payment_intent ;
             }
             const updt = await updateRecord('charging_service', { order_status : 'CNF', payment_intent_id : paymentIntentId }, ['request_id', 'rider_id'], [request_id, rider_id] );
@@ -75,7 +74,7 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
             createNotification(heading, desc, 'Charging Service', 'Admin', 'Rider', rider_id, '', href);
             pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
         
-           const htmlUser = `<html>
+            const htmlUser = `<html>
                 <body>
                     <h4>Dear ${checkOrder.name},</h4>
                     <p>Thank you for choosing our EV Pickup and Drop Off service. We are pleased to confirm that your booking has been successfully received.</p>
@@ -99,10 +98,10 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
                     <p>Contact No. : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
                     <p>Address     : ${checkOrder.pickup_address}</p>
                     <p>Service Date and Time : ${moment(checkOrder.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</p>
-                    <p>Vehicle Details: ${checkOrder.vehicle_data}  </p>
+                    <p>Vehicle Details: ${checkOrder.vehicle_data}</p>
                 
                     <a href="https://www.google.com/maps?q=${checkOrder.pickup_latitude},${checkOrder.pickup_longitude}">Address Link</a><br>               
-                    <p> Best regards,<br/> PlusX Electric Team </p>
+                    <p>Best regards,<br/> PlusX Electric Team </p>
                 </body>
             </html>`;
             emailQueue.addEmail(process.env.MAIL_CS_ADMIN, `EV Pickup and Drop-Off - ${request_id}`, htmlAdmin);
@@ -194,16 +193,13 @@ export const portableChargerInvoice = asyncHandler(async (req, resp) => {
             </html>`;
             emailQueue.addEmail(checkOrder.rider_email, 'PlusX Electric App: Booking Confirmation for Your Portable EV Charger', htmlUser);
 
-            let dubaiTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Dubai" });
-            dubaiTime     = moment(dubaiTime).format('D MMM, YYYY, h:mm A');
-
             const htmlAdmin = `<html>
                 <body>
                     <h4>Dear Admin,</h4>
                     <p>We have received a new booking for our Portable Charger service. Please find the details below:</p> 
-                    <p>Customer Name : ${checkOrder.user_name}</p>
-                    <p>Contact No.   : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
-                    <p>Address       : ${checkOrder.address}</p>            
+                    <p>Customer Name       : ${checkOrder.user_name}</p>
+                    <p>Contact No.         : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
+                    <p>Address             : ${checkOrder.address}</p>            
                     <p>Service Date & Time : ${moment(checkOrder.slot_date, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(checkOrder.slot_time, 'HH:mm').format('h:mm A')}</p>       
                     <p>Vechile Details : ${checkOrder.vehicle_data}</p> 
                     <a href="https://www.google.com/maps?q=${checkOrder.latitude},${checkOrder.longitude}">Address Link</a><br>
@@ -289,14 +285,10 @@ export const rsaInvoice = asyncHandler(async (req, resp) => {
             createNotification(heading, desc, 'Roadside Assistance', 'Admin', 'Rider', rider_id, '', href);
             pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
         
-            // let dubaiTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Dubai" });
-            // dubaiTime     = moment(dubaiTime).format('D MMM, YYYY, h:mm A');
-            // <p>Booking Time   : ${dubaiTime}</p>
-            // <p>Date & Time of Request: ${dubaiTime}</p> 
             const htmlUser = `<html>
                 <body>
                     <h4>Dear ${checkOrder.name},</h4>
-                    <p>Thank you for choosing our Roadside Assistance service for your EV. We are pleased to confirm that your booking has been successfully received.</p> <br>
+                    <p>Thank you for choosing our Roadside Assistance service for your EV. We are pleased to confirm that your booking has been successfully received.</p>
                     <p>Booking Details:</p>
                     <p>Booking ID: ${request_id}</p>
                     <p>Address: ${checkOrder.pickup_address}</p>    
@@ -317,7 +309,6 @@ export const rsaInvoice = asyncHandler(async (req, resp) => {
                     <p>Best regards,<br/> PlusX Electric Team </p>
                 </body>
             </html>`;
-            
             emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `EV Roadside Assistance Booking - ${request_id}`, htmlAdmin);
             
             // await commitTransaction(conn);

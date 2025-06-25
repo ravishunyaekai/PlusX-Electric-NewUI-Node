@@ -86,7 +86,7 @@ export const rsaData = asyncHandler(async (req, resp) => {
         bookingType,
         // bookingHistory,
         locationHistory,
-        base_url: `${req.protocol}://${req.get('host')}/uploads/rsa_images/`
+        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/rsa_images/`
     });
 });
 export const driverBookingList = async (req, resp) => {

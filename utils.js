@@ -11,6 +11,7 @@ import dotenv from 'dotenv';
 import db from "./config/db.js";
 dotenv.config();
 import moment from "moment-timezone";
+import { deleteImageFromS3 } from "./fileUpload.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -83,28 +84,26 @@ export const delOTP = (key) => {
   return otpCache.del(key);
 };
 
-
 /* API Call to Send OTP */
 export const sendOtp = async (mobile, otpMsg) => {
-  const username = process.env.SMS_USERNAME;
-  const password = process.env.SMS_PASSWORD;
-  const from = "PlusX";
+    const username = process.env.SMS_USERNAME;
+    const password = process.env.SMS_PASSWORD;
+    const from = "PlusX";
 
-  const baseUrl = `https://api.smsglobal.com/http-api.php?action=sendsms&user=${username}&password=${password}&from=${encodeURIComponent(
-    from
-  )}&to=${mobile}&text=${encodeURIComponent(otpMsg)}`;
+    const baseUrl = `https://api.smsglobal.com/http-api.php?action=sendsms&user=${username}&password=${password}&from=${encodeURIComponent(
+        from
+    )}&to=${mobile}&text=${encodeURIComponent(otpMsg)}`;
 
-  try {
-    const response = await axios.get(baseUrl);
+    try {
+        const response = await axios.get(baseUrl);
 
-    if (response.data) {
-      return { status: 1, msg: response.data };
+        if (response.data) {
+        return { status: 1, msg: response.data };
+        }
+    } catch (err) {
+        return { status: 0, msg: err.message, code: err.status };
     }
-  } catch (err) {
-    return { status: 0, msg: err.message, code: err.status };
-  }
 };
-
 
 /* Format Timings */
 export const getOpenAndCloseTimings = (data) => {
@@ -395,14 +394,18 @@ export const formatDateInQuery = (columns) => {
 
 /* Helper to delete a image from uploads/ */
 export const deleteFile = (directory, filename) => {
-  const file_path = path.join('uploads', directory, filename);
-  if(file_path){
-    fs.unlink(file_path, (err) => {
-        if (err) console.error(`Failed to delete ${directory} image ${filename}:`, err);
-    });
-  }else{
-    console.log('File does not exist.');
-  }
+    // const file_path = path.join('uploads', directory, filename);
+    
+    const oldImagePath = path.join(process.env.S3_FOLDER_NAME, directory, filename || '').replace(/\\/g, '/');
+    deleteImageFromS3(oldImagePath);    
+
+    // if(file_path){
+    //     fs.unlink(file_path, (err) => {
+    //         if (err) console.error(`Failed to delete ${directory} image ${filename}:`, err);
+    //     });
+    // } else {
+    //     console.log('File does not exist.');
+    // }
 };
 
 export const asyncHandler = (fn) => {
@@ -417,7 +420,7 @@ export const generatePdf = async (templatePath, invoiceData, fileName, savePdfDi
   try {
     const html = await ejs.renderFile(templatePath, { ...invoiceData });
     // const serverUrl = `https://plusx.shunyaekai.com/web/upload-pdf`;
-    const serverUrl = `${req.protocol}://${req.get('host')}/web/upload-pdf`;       
+    const serverUrl = `https://plusx.s3.ap-south-1.amazonaws.com/web/upload-pdf`;       
 
     const response = await axios.post('http://supro.shunyaekai.tech:8801/pdf-api.php', {  //http://supro.shunyaekai.tech:8801/pdf-api.php
       html,
@@ -473,13 +476,14 @@ export const checkCoupon = async (rider_id, booking_type, coupon_code, bookingPr
         amount = (booking_type == 'Valet Charging') ? priceData.pick_drop_price : priceData.portable_price ;
     }
     const data = {}; 
+    
     if ( coupon.coupan_percentage != parseFloat(100) ) {
         const dis_price = ( amount  * coupon.coupan_percentage ) /100;
         const total_amt = amount - dis_price;
         
         const vat_amt  = Math.floor(( total_amt ) * 5) / 100;
         data.total_amt = total_amt + vat_amt;
-
+        
     } else {
         const vat_amt  = Math.floor(( amount ) * 5) / 100;
         const total_amt = parseFloat(amount) + parseFloat( vat_amt ); 

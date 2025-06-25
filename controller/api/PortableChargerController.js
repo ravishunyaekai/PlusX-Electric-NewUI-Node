@@ -36,7 +36,7 @@ export const chargerList = asyncHandler(async (req, resp) => {
         slot_data  : slotData,
         total_page : result.totalPage,
         total      : result.total,
-        base_url   : `${req.protocol}://${req.get('host')}/uploads/portable-charger/`,
+        base_url   : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/portable-charger/`,
     });
 });
 
@@ -266,7 +266,7 @@ export const chargerBookingList = asyncHandler(async (req, resp) => {
         inProcessBookingList,
         status     : 1,
         code       : 200,
-        base_url   : `${req.protocol}://${req.get('host')}/uploads/portable-charger/`,
+        base_url   : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/portable-charger/`,
         noResultMsg : 'There are no recent bookings. Please schedule your booking now.'
     });
 });
@@ -288,7 +288,7 @@ export const chargerBookingDetail = asyncHandler(async (req, resp) => {
 
     if (booking && ( booking.status == 'CS' || booking.status == 'PU' || booking.status == 'RO' ) ) {
         const invoice_id = booking.booking_id.replace('PCB', 'INVPC');
-        booking.invoice_url = `${req.protocol}://${req.get('host')}/public/portable-charger-invoice/${invoice_id}-invoice.pdf`;
+        booking.invoice_url = `https://plusx.s3.ap-south-1.amazonaws.com/public/portable-charger-invoice/${invoice_id}-invoice.pdf`;
     }
     if(booking.vehicle_data == '' || booking.vehicle_data == null) {
         const vehicledata = await queryDB(`
@@ -351,7 +351,7 @@ export const getPcSubscriptionList = asyncHandler(async (req, resp) => {
         status: 1,
         subscription_price: sPrice,
         code: 200,
-        subscription_img: `${req.protocol}://${req.get('host')}/public/pod-no-subscription.jpeg`,
+        subscription_img: `https://plusx.s3.ap-south-1.amazonaws.com/public/pod-no-subscription.jpeg`,
     });
 });
 
@@ -388,7 +388,7 @@ export const invoiceList = asyncHandler(async (req, resp) => {
         data       : result.data,
         total_page : result.totalPage,
         total      : result.total,
-        base_url   : `${req.protocol}://${req.get('host')}/uploads/offer/`,
+        base_url   : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/offer/`,
     });
 });
 export const invoiceDetails = asyncHandler(async (req, resp) => {
@@ -410,7 +410,7 @@ export const invoiceDetails = asyncHandler(async (req, resp) => {
             pci.invoice_id = ?
     `, [invoice_id]);
 
-    invoice.invoice_url = `${req.protocol}://${req.get('host')}/uploads/portable-charger-invoice/${invoice_id}-invoice.pdf`;
+    invoice.invoice_url = `https://plusx.s3.ap-south-1.amazonaws.com/uploads/portable-charger-invoice/${invoice_id}-invoice.pdf`;
 
     return resp.json({
         message : ["Pick & Drop Invoice Details fetch successfully!"],
@@ -475,16 +475,13 @@ export const userCancelPCBooking = asyncHandler(async (req, resp) => {
             <h4>Dear ${checkOrder.user_name},</h4>
             <p>We would like to inform you that your booking for the portable charger has been successfully cancelled. Below are the details of your cancelled booking:</p>
             <p>Booking ID    : ${booking_id}</p>
-            <p>Date and Time : ${moment(checkOrder.slot_date, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(checkOrder.slot_time, 'HH:mm').format('h:mm A')}</p><br>
+            <p>Date and Time : ${moment(checkOrder.slot_date, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(checkOrder.slot_time, 'HH:mm').format('h:mm A')}</p>
 
             <p>Thank you for using PlusX Electric. We look forward to serving you again soon.</p>
             <p>Best regards,<br/>PlusX Electric Team </p>
         </body>
     </html>`;
-    emailQueue.addEmail(checkOrder.rider_email, `Portable Charger Service Booking Cancellation (Booking ID: ${booking_id})`, html);
-    //  Booking ID    : ${booking_id}</br>
-    //  ${reason ? `Cancellation Reason : ${reason}</br>` : ''}
-
+    emailQueue.addEmail(checkOrder.rider_email, `PlusX Electric App: Booking Cancellation`, html);
     const adminHtml = `<html>
         <body>
             <h4>Dear Admin,</h4>
@@ -494,12 +491,12 @@ export const userCancelPCBooking = asyncHandler(async (req, resp) => {
             <p>Contact No          : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
             <p>Address             : ${checkOrder.address}</p>
             <p>Service Date & Time : ${checkOrder.slot_date} - ${checkOrder.slot_time}</p> 
-            <p>Vehicle Details     : ${checkOrder.vehicle_data}</p><br>
+            <p>Vehicle Details     : ${checkOrder.vehicle_data}</p>
             <p>Thank you for your attention to this update.</p>
             <p>Best regards,<br/>PlusX Electric Team </p>
         </body>
     </html>`;
-    emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Portable Charger Service Booking Cancellation ( :Booking ID : ${booking_id} )`, adminHtml); 
+    emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Portable Charger Service Booking Cancellation ( Booking ID : ${booking_id} )`, adminHtml); 
     return resp.json({ message: ['Your booking has been successfully cancelled.'], status: 1, code: 200 });
 });
 
@@ -561,7 +558,6 @@ export const userFeedbackPCBooking = asyncHandler(async (req, resp) => {
         return resp.json({ message: ['Feedback already submitted!'], status: 0, code: 200 });
     }
 });
-
 
 export const reScheduleBooking = asyncHandler(async (req, resp) => {
     
@@ -670,24 +666,24 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
     
         const htmlUser = `<html>
             <body>
-                <h4>Hi ${checkOrder.user_name},</h4>
-                <p>We would like to confirm that your booking for the Portable EV Charging Service has been successfully rescheduled. Please find the updated details below:</p> <br>
+                <h4>Dear ${checkOrder.user_name},</h4>
+                <p>We would like to confirm that your booking for the Portable EV Charging Service has been successfully rescheduled. Please find the updated details below:</p>
                 
                 <p>Booking ID: ${booking_id}</p>
                 <p>Rescheduled Date & Time : ${moment(fSlotDate, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(slot_time, 'HH:mm').format('h:mm A')}</p>
 
                 <p>Thank you for choosing PlusX Electric. If you have any questions or need further assistance, feel free to contact us.</p>                  
-                <p> Warm regards,<br/>PlusX Electric Team</p>
+                <p>Best regards,<br/> PlusX Electric Team </p>
             </body>
         </html>`;
         emailQueue.addEmail(checkOrder.rider_email, `Booking Rescheduled Successfully - ${booking_id}`, htmlUser);
         const htmlAdmin = `<html>
             <body>
                 <h4>Dear Admin,</h4>
-                <p>This is to inform you that a user has rescheduled their Portable EV Charging Service booking. Please find the updated booking details below:</p><br> 
-                <p>User Name : ${checkOrder.user_name}</p>
-                <p>User Contact   : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
-                <p>Booking ID : ${checkOrder.user_name}</p>
+                <p>This is to inform you that a user has rescheduled their Portable EV Charging Service booking. Please find the updated booking details below:</p> 
+                <p>User Name       : ${checkOrder.user_name}</p>
+                <p>User Contact    : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
+                <p>Booking ID      : ${booking_id}</p>
                 <p>New Scheduled Date & Time : ${moment(fSlotDate, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(slot_time, 'HH:mm').format('h:mm A')}</p>
                 <p>Location        : ${checkOrder.address}</p>       
                 <p>Vechile Details : ${checkOrder.vehicle_data}</p>
@@ -695,7 +691,7 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
                 <p>Best regards,<br/>PlusX Electric Team </p>
             </body>
         </html>`;
-        emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Portable Charger Booking Rescheduled - (Booking ID : ${booking_id} )`, htmlAdmin);
+        emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Portable Charger Booking Rescheduled (Booking ID : ${booking_id} )`, htmlAdmin);
         
         let respMsg = "Booking request received! Your booking has been successfully rescheduled. Our team will arrive at the updated time.";
 

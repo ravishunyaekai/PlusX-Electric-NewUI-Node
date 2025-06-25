@@ -53,7 +53,7 @@ export const stationList = asyncHandler(async (req, resp) => {
         total_page,
         status   : 1,
         code     : 200,
-        base_url : new URL('/uploads/charging-station-images/', req.protocol + '://' + req.get('host')).href
+        base_url : `${process.env.DIR_UPLOADS}charging-station-images/`
     }); 
 });
 
@@ -96,7 +96,7 @@ export const stationDetail = asyncHandler(async (req, resp) => {
         message      : ["Charging Station Details fetched successfully!"],
         data         : station,
         gallery_data : imgName,
-        base_url     : new URL('/uploads/charging-station-images/', req.protocol + '://' + req.get('host')).href
+        base_url     : `${process.env.DIR_UPLOADS}charging-station-images/`
     });
 });
 

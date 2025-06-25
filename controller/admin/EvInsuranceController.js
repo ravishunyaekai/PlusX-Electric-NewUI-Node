@@ -37,11 +37,11 @@ export const evInsuranceDetail = asyncHandler(async (req, resp) => {
     const data = await queryDB(`SELECT *, ${formatDateTimeInQuery(['created_at', 'updated_at', 'insurance_expiry'])}, ${formatDateInQuery(['date_of_birth'])} FROM ev_insurance WHERE insurance_id = ? LIMIT 1`, [insurance_id]);
     
     return resp.json({
-        status: 1,
-        code: 200,
-        message: ["EV Insurance Detail fetched successfully!"],
-        data: data,
-        base_url: `${req.protocol}://${req.get('host')}/uploads/insurance-images/`,
+        status   : 1,
+        code     : 200,
+        message  : ["EV Insurance Detail fetched successfully!"],
+        data     : data,
+        base_url : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/insurance-images/`,
     });
 });
 
@@ -117,11 +117,11 @@ export const evPreSaleDetail = asyncHandler(async (req, resp) => {
     `, [booking_id]);
     
     return resp.json({
-        status: 1,
-        code: 200,
-        message: ["EV Insurance Detail fetched successfully!"],
-        data: data,
-        base_url: `${req.protocol}://${req.get('host')}/uploads/insurance-images/`,
+        status   : 1,
+        code     : 200,
+        message  : ["EV Insurance Detail fetched successfully!"],
+        data     : data,
+        base_url : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/insurance-images/`,
     });
 });
 

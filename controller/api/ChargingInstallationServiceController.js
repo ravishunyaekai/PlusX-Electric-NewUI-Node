@@ -123,11 +123,11 @@ export const requestDetails = asyncHandler(async (req, resp) => {
         SELECT *, ${formatDateTimeInQuery(['created_at', 'updated_at'])} FROM charging_installation_service WHERE request_id = ? LIMIT 1
     `, [request_id]);
 
-    orderData[0].invoice_url = '';
-    if (orderData[0].order_status == 'ES') {
-        const invoice_id = orderData[0].request_id.replace('CS', 'INVCS');
-        orderData[0].invoice_url = `${req.protocol}://${req.get('host')}/public/charger-installation-invoice/${invoice_id}-invoice.pdf`;
-    }
+    // orderData[0].invoice_url = '';
+    // if (orderData[0].order_status == 'ES') {
+    //     const invoice_id = orderData[0].request_id.replace('CS', 'INVCS');
+    //     orderData[0].invoice_url = `https://plusx.s3.ap-south-1.amazonaws.com/public/charger-installation-invoice/${invoice_id}-invoice.pdf`;
+    // }
 
     const [history] = await db.execute(`
         SELECT *, ${formatDateTimeInQuery(['created_at', 'updated_at'])} FROM charging_installation_service_history WHERE service_id = ?

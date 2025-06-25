@@ -13,6 +13,7 @@ import { mergeParam, generateRandomPassword, checkNumber, generateOTP, storeOTP,
 dotenv.config();
 import { tryCatchErrorHandler } from "../../middleware/errorHandler.js";
 
+import { deleteImageFromS3 } from "../../fileUpload.js";
 /* Rider Auth */
 export const login = asyncHandler(async (req, resp) => {
     const { mobile, password ,fcm_token , country_code } = mergeParam(req);
@@ -37,7 +38,7 @@ export const login = asyncHandler(async (req, resp) => {
     const [update] = await db.execute(`UPDATE riders SET access_token = ?, status = ?, fcm_token = ? WHERE rider_mobile = ?`, [token, 1, fcm_token, mobile]);
     if(update.affectedRows > 0){
         const result = {
-            image_url: `${req.protocol}://${req.get('host')}/uploads/rider_profile/`,
+            image_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/rider_profile/`,
             rider_id: rider.rider_id,
             rider_name: rider.rider_name,
             rider_email: rider.rider_email,
@@ -96,7 +97,7 @@ export const register = asyncHandler(async (req, resp) => {
     await db.execute('UPDATE riders SET rider_id = ? WHERE id = ?', [riderId, rider.insertId]);
     
     const result = {
-        image_url    : `${req.protocol}://${req.get('host')}/uploads/rider_profile/`,
+        image_url    : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/rider_profile/`,
         rider_id     : riderId,
         rider_name   : first_name,
         last_name    : last_name,
@@ -209,15 +210,15 @@ export const verifyOTP = asyncHandler(async (req, resp) => {
     const token  = crypto.randomBytes(12).toString('hex');
     await updateRecord('riders', { access_token: token, status : 1, fcm_token, device_name }, ['rider_mobile', 'country_code'], [mobile, country_code]);
 
-    let profileImg = riderData.profile_img ? `${req.protocol}://${req.get('host')}/uploads/rider_profile/${riderData.profile_img}` : '';
+    // let profileImg = riderData.profile_img ? `https://plusx.s3.ap-south-1.amazonaws.com/uploads/rider_profile/${riderData.profile_img}` : '';
     delOTP(fullMobile);
     let respResult = {
-        image_url     : `${req.protocol}://${req.get('host')}/uploads/rider_profile/`,
+        image_url     : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/rider_profile/`,
         rider_id      : riderData.rider_id,
         rider_name    : riderData.rider_name,
         last_name     : riderData.last_name,
         rider_email   : riderData.rider_email,
-        profile_img   : profileImg,
+        profile_img   : riderData.profile_img,
         rider_mobile  : mobile,
         country_code  : country_code,        
         emirates      : riderData.emirates,
@@ -333,7 +334,7 @@ export const getRiderData = asyncHandler(async(req, resp) => {
     if (!rider_id) return resp.json({ status: 0, code: 422, message: ["Rider Id is required"] });
     
     const rider = await queryDB(`SELECT *, ${formatDateTimeInQuery(['created_at', 'updated_at'])}, ${formatDateInQuery(['date_of_birth'])} FROM riders WHERE rider_id=?`, [rider_id]);
-    rider.image_url = `${req.protocol}://${req.get('host')}/uploads/rider_profile/`;
+    rider.image_url = `https://plusx.s3.ap-south-1.amazonaws.com/uploads/rider_profile/`;
 
     return resp.json({
         status  : 1, 
@@ -369,12 +370,9 @@ export const updateProfile = asyncHandler(async (req, resp) => {
 
         if(req.files && req.files['profile_image']) { 
          
-            const oldImagePath = path.join('uploads', 'rider_profile', rider.profile_img || '');
-            fs.unlink(oldImagePath, (err) => {
-                if (err) {
-                    console.error(`Failed to delete rider old image: ${oldImagePath}`, err);
-                }
-            });
+            const oldImagePath = path.join(process.env.S3_FOLDER_NAME, 'rider_profile', rider.profile_img || '').replace(/\\/g, '/');
+            await deleteImageFromS3(oldImagePath);
+            
         }
         const updates = {
             rider_name : first_name, 
@@ -401,13 +399,9 @@ export const deleteImg = asyncHandler(async (req, resp) => {
     const rider = await queryDB(`SELECT profile_img FROM riders WHERE rider_id = ?`, [rider_id]);
     if(!rider) return resp.json({status:0, code:400, message: 'Rider ID Invalid!'});
     
-    const update = await updateRecord('riders', {profile_img: ''}, ['rider_id'], [rider_id]);
-    const oldImagePath = path.join('uploads', 'rider_profile', rider.profile_img || '');
-    fs.unlink(oldImagePath, (err) => {
-        if (err) {
-            console.error(`Failed to delete rider old image: ${oldImagePath}`, err);
-        }
-    });
+    const update       = await updateRecord('riders', {profile_img: ''}, ['rider_id'], [rider_id]);
+    const oldImagePath = path.join(process.env.S3_FOLDER_NAME, 'rider_profile', rider.profile_img || '').replace(/\\/g, '/');
+    await deleteImageFromS3(oldImagePath);
 
     return resp.json({
         status: update.affectedRows > 0 ? 1 : 0,

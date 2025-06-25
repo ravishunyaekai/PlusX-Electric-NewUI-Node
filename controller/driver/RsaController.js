@@ -6,16 +6,20 @@ import db from "../../config/db.js";
 import emailQueue from "../../emailQueue.js";
 import validateFields from "../../validation.js";
 import { insertRecord, queryDB, updateRecord } from '../../dbUtils.js';
-import { asyncHandler, formatDateInQuery, formatDateTimeInQuery, generateRandomPassword, mergeParam } from "../../utils.js";
+import { asyncHandler, formatDateTimeInQuery, generateRandomPassword, mergeParam } from "../../utils.js";
+
+import dotenv from "dotenv";
+dotenv.config();
 
 import { tryCatchErrorHandler } from "../../middleware/errorHandler.js";
+import { deleteImageFromS3 } from "../../fileUpload.js";
 
 export const rsaLogin = asyncHandler(async (req, resp) => {
     const { mobile, password ,fcm_token , latitude, longitude } = mergeParam(req);
     const { isValid, errors } = validateFields(mergeParam(req), {
         mobile: ["required"], password: ["required"], fcm_token: ["required"], latitude: ["required"], longitude: ["required"]
     });
-    console.log("local server")
+    
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
 
     const rsa = await queryDB(`SELECT rsa_name, password, rsa_id, profile_img, status, email, mobile, running_order FROM rsa WHERE mobile=? LIMIT 1`, [mobile]);
@@ -39,9 +43,7 @@ export const rsaLogin = asyncHandler(async (req, resp) => {
             gender       : rsa.gender,
             rsa_type     : rsa.rsa_type,
             birthday     : rsa.birthday,
-            profile_img  : `${req.protocol}://${req.get('host')}/uploads/rsa_images/${rsa.profile_img}`,
-            passport_img : `${req.protocol}://${req.get('host')}/uploads/rsa_images/${rsa.passport_img}`,
-            dl_img       : `${req.protocol}://${req.get('host')}/uploads/rsa_images/${rsa.dl_img}`,
+            profile_img  : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/rsa_images/${rsa.profile_img}`,
             access_token : access_token,
         };
         return resp.json({status:1, code:200, message: ["RSA Login successfully"], data: result});
@@ -144,19 +146,16 @@ export const rsaUpdateProfile = asyncHandler(async (req, resp) => {
             profile_image = files ? files['profile-image'][0].filename : '';
         }
         if (rsa.profile_img && req.files[['profile-image']]){
-            const oldImagePath = path.join('uploads', 'rsa_images', rsa.profile_img);
-            fs.unlink(oldImagePath, (err) => {
-                if (err) {
-                    console.error(`Failed to delete rider old image: ${oldImagePath}`, err);
-                }
-            });
+
+            const oldImagePath = path.join(process.env.S3_FOLDER_NAME, 'rsa_images', rsa.profile_img || '').replace(/\\/g, '/');
+            await deleteImageFromS3(oldImagePath);
         }
         await updateRecord('rsa', { profile_img: profile_image }, ['rsa_id'], [rsa_id]);
         return resp.json({
-            status: 1, 
-            code: 200, 
-            message: ["RSA profile updated successfully"],
-            image_url: `${req.protocol}://${req.get('host')}/uploads/rsa_images/${profile_image}`
+            status    : 1, 
+            code      : 200, 
+            message   : ["RSA profile updated successfully"],
+            image_url : `${process.env.DIR_UPLOADS}rsa_images/${profile_image}`
         });
         // return resp.json({ img : profile_image });
 
@@ -254,9 +253,12 @@ export const rsaHome = asyncHandler(async (req, resp) => {
             ${formatDateTimeInQuery(['pb.created_at'])}, 
             (SELECT CONCAT(vehicle_make, "-", vehicle_model) FROM riders_vehicles WHERE vehicle_id = pb.vehicle_id) AS vehicle_data
         FROM order_assign
-        LEFT JOIN road_assistance AS pb ON pb.request_id = order_assign.order_id
-        WHERE order_assign.rsa_id = ?
-        ORDER BY id ASC
+        LEFT JOIN 
+            road_assistance AS pb ON pb.request_id = order_assign.order_id
+        WHERE 
+            order_assign.rsa_id = ?
+        ORDER BY 
+            order_assign.id ASC
     `,[rsa_id]);
    
     const { status, running_order, booking_type, valet_count, pod_count, running_order_count, valet_rej, pod_rejected, valet_completed, pod_completed, pod_cancelled, valet_cancelled } = rsaData;
@@ -294,7 +296,7 @@ export const rsaBookingHistory = asyncHandler(async (req, resp) => {
     let result = {};
     
     if(booking_type != 'R'){
-        console.log('idhar');
+        
         const [valetCompleted] = await db.execute(`
             SELECT
                 request_id, pickup_address, pickup_latitude, pickup_longitude, order_status, parking_number, parking_floor, 
@@ -332,7 +334,7 @@ export const rsaBookingHistory = asyncHandler(async (req, resp) => {
                 pcb.updated_at DESC
         `, [rsa_id]);
         
-        const baseUrl = `${req.protocol}://${req.get('host')}/uploads/portable-charger/`;
+        const baseUrl = `${process.env.DIR_UPLOADS}portable-charger/`;
         const podCompletedWithImages = podCompleted.map(record => {
             return {
                 ...record,
@@ -343,7 +345,7 @@ export const rsaBookingHistory = asyncHandler(async (req, resp) => {
         result.valet_completed = valetCompleted;
         result.pod_completed = podCompletedWithImages;
     } else {
-        console.log('Udhar');
+        
         const [valetRejected] = await db.execute(`
             SELECT 
                 cs.request_id, cs.pickup_address, cs.pickup_latitude, cs.pickup_longitude, cs.order_status, cs.parking_number, cs.parking_floor, 

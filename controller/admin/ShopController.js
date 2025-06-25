@@ -54,7 +54,7 @@ export const storeData = asyncHandler(async (req, resp) => {
         brands: brandNames,
         galleryData: imgName,
         galleryId: imgId,
-        base_url: `${req.protocol}://${req.get('host')}/uploads/shop-images/`,
+        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/shop-images/`,
     }
     if(shop_id){
         result.shop = shop;
@@ -135,7 +135,7 @@ export const storeView = asyncHandler(async (req, resp) => {
         location,
         galleryData,
         address,
-        base_url: `${req.protocol}://${req.get('host')}/uploads/shop-images/`,
+        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/shop-images/`,
     });
 });
 

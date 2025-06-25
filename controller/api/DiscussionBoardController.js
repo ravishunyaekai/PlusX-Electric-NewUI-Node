@@ -117,14 +117,14 @@ export const getDiscussionBoardList = asyncHandler(async (req, resp) => {
         });
 
         return resp.json({
-            status: 1,
-            code: 200,
-            message: ["Discussion Board List fetch successfully!"],
-            data: result.data,
-            total_page: result.totalPage,
-            total: result.total,
-            base_url: `${req.protocol}://${req.get('host')}/uploads/discussion-board-images/`,
-            rider_img_url: `${req.protocol}://${req.get('host')}/uploads/rider_profile/`,
+            status        : 1,
+            code          : 200,
+            message       : ["Discussion Board List fetch successfully!"],
+            data          : result.data,
+            total_page    : result.totalPage,
+            total         : result.total,
+            base_url      : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/discussion-board-images/`,
+            rider_img_url : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/rider_profile/`,
         });
     }catch(err){
         console.log('Error getting board list:', err);
@@ -245,8 +245,8 @@ export const getDiscussionBoardDetail = asyncHandler(async (req, resp) => {
             polls: polls,
             status: 1,
             code: 200,
-            base_url: `${req.protocol}://${req.get('host')}/uploads/discussion-board-images/`,
-            rider_img_url: `${req.protocol}://${req.get('host')}/uploads/rider_profile/`
+            base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/discussion-board-images/`,
+            rider_img_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/rider_profile/`
         });        
     }catch(err){
         console.error('Error getting board detail:', err);

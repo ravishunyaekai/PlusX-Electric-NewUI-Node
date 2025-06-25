@@ -221,7 +221,7 @@ export const truckFuelHhistory = async (req, resp) => {
             data       : result.data,
             total_page : result.totalPage,
             total      : result.total,
-            image_url: `${req.protocol}://${req.get('host')}/uploads/truck-images/`
+            image_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/truck-images/`
         });
     } catch (error) {
         console.error('Error fetching device list:', error);

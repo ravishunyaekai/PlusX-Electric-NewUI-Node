@@ -56,7 +56,7 @@ export const clubList = asyncHandler(async (req, resp) => {
         age_group: ['17 & Younger', 'Above 18', 'All age group'],
         status: 1,
         code: 200,
-        base_url: `${req.protocol}://${req.get('host')}/uploads/club-images/`
+        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/club-images/`
     });
 });
 
@@ -76,7 +76,7 @@ export const clubDetail = asyncHandler(async (req, resp) => {
         message: ["Bike Rental Details fetched successfully!"],
         data: clubData,
         gallery_data: galleryData,
-        base_url: `${req.protocol}://${req.get('host')}/uploads/bike-rental-images/`,
+        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/bike-rental-images/`,
     });
 
 });

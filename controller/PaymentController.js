@@ -75,6 +75,7 @@ export const createIntent = async (req, resp) => {
                 booking_type : booking_type,
                 booking_id   : booking_id,
                 user_id      : rider_id,
+                coupon_code  : coupon_code,
             },
         });
         const returnData = {
@@ -84,14 +85,14 @@ export const createIntent = async (req, resp) => {
             customer            : customerId,
             publishableKey      : process.env.STRIPE_PUBLISER_KEY,
         };
-        if(coupon_code){
-            const coupon = await queryDB(`SELECT coupan_percentage FROM coupon WHERE coupan_code = ? LIMIT 1 `, [ coupon_code ]); 
+        // if(coupon_code){
+        //     const coupon = await queryDB(`SELECT coupan_percentage FROM coupon WHERE coupan_code = ? LIMIT 1 `, [ coupon_code ]); 
     
-            let coupan_percentage = coupon.coupan_percentage ;
-            await insertRecord('coupon_usage', ['coupan_code', 'user_id', 'booking_id', 'coupan_percentage'], [coupon_code, rider_id, booking_id, coupan_percentage]);
-        }
+        //     let coupan_percentage = coupon.coupan_percentage ;
+        //     await insertRecord('coupon_usage', ['coupan_code', 'user_id', 'booking_id', 'coupan_percentage'], [coupon_code, rider_id, booking_id, coupan_percentage]);
+        // }
 
-        await updateBoking( booking_type, booking_id, rider_id, paymentIntent.id ); 
+        // await updateBoking( booking_type, booking_id, rider_id, paymentIntent.id ); 
         return resp.json({
             message : ["Payment Intent Created successfully!"],
             data    : returnData,
@@ -617,15 +618,16 @@ export const getPaymentSession = async (req, resp) => {
                 booking_type : booking_type,
                 booking_id   : booking_id,
                 user_id      : rider_id,
+                coupon_code  : coupon_code,
             },
         });
-        if(coupon_code) { 
-            const coupon = await queryDB(`SELECT coupan_percentage FROM coupon WHERE coupan_code = ? LIMIT 1 `, [ coupon_code ]); 
+        // if(coupon_code) { 
+        //     const coupon = await queryDB(`SELECT coupan_percentage FROM coupon WHERE coupan_code = ? LIMIT 1 `, [ coupon_code ]); 
     
-            let coupan_percentage = coupon.coupan_percentage ;
-            await insertRecord('coupon_usage', ['coupan_code', 'user_id', 'booking_id', 'coupan_percentage'], [coupon_code, rider_id, booking_id, coupan_percentage]);
-        }
-        await updateBoking( booking_type, booking_id, rider_id, session.id ); 
+        //     let coupan_percentage = coupon.coupan_percentage ;
+        //     await insertRecord('coupon_usage', ['coupan_code', 'user_id', 'booking_id', 'coupan_percentage'], [coupon_code, rider_id, booking_id, coupan_percentage]);
+        // }
+        // await updateBoking( booking_type, booking_id, rider_id, session.id ); 
         return resp.json({ 
             message    : ['Paymnet session'], 
             status     : 1, 

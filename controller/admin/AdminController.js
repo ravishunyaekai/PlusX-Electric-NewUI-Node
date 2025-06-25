@@ -2,8 +2,8 @@ import db from '../../config/db.js';
 import dotenv from 'dotenv';
 import validateFields from "../../validationForAdmin.js";
 import { insertRecord,  getPaginatedData, queryDB, updateRecord } from '../../dbUtils.js';
-import { asyncHandler,mergeParam, formatDateTimeInQuery } from '../../utils.js';
-import path from 'path';
+import { asyncHandler, mergeParam, formatDateTimeInQuery } from '../../utils.js';
+// import path from 'path';
 import moment from 'moment';
 // import { fileURLToPath } from 'url';
 // import fs from 'fs';
@@ -29,7 +29,8 @@ export const getDashboardData = async (req, resp) => {
             (SELECT COUNT(*) FROM ev_pre_sale_testing WHERE created_at >= "${currentDate}") AS total_pre_sale_testing,
             (SELECT COUNT(*) FROM public_charging_station_list) AS total_station,
             (SELECT COUNT(*) FROM failed_portable_charger_booking WHERE created_at >= "${currentDate}" ) AS total_charger_booking_failed,
-            (SELECT COUNT(*) FROM failed_charging_service WHERE created_at >= "${currentDate}" ) AS total_charging_service_failed
+            (SELECT COUNT(*) FROM failed_charging_service WHERE created_at >= "${currentDate}" ) AS total_charging_service_failed,
+            (SELECT COUNT(*) FROM failed_road_assistance WHERE created_at >= "${currentDate}" ) AS total_rsa_failed
         `);
 
         const [rsaRecords] = await db.execute(`SELECT id, rsa_id, rsa_name, email, country_code, mobile, status, latitude AS lat, longitude AS lng FROM rsa where latitude != '' and status In(1, 2)`);
@@ -66,7 +67,9 @@ export const getDashboardData = async (req, resp) => {
             { module : 'Total Public Chargers',                  count : counts[0].total_station }, 
             { module : 'Today POD Failed Bookings',              count : counts[0].total_charger_booking_failed }, 
             { module : 'Today Pickup & Dropoff Failed Bookings', count : counts[0].total_charging_service_failed },
+            { module : 'Today Road Side Failed Bookings', count : counts[0].total_rsa_failed },
 
+            // 
             // { module: 'EV Buy & Sell', count: counts[0].total_vehicle_sell },
             // { module: 'Total Electric Bikes Leasing', count: counts[0].total_bike_rental }, 
             // { module: 'Total Electric Cars Leasing', count: counts[0].total_car_rental },
@@ -149,14 +152,13 @@ export const riderList = async (req, resp) => {
             whereOperator: []
         };
         if (start_date && end_date) {
-            // const start = moment(start_date, "YYYY-MM-DD").startOf('day').format("YYYY-MM-DD HH:mm:ss");
-            // const end = moment(end_date, "YYYY-MM-DD").endOf('day').format("YYYY-MM-DD HH:mm:ss");
+            
             const startToday = new Date(start_date);
             const startFormattedDate = `${startToday.getFullYear()}-${(startToday.getMonth() + 1).toString()
                 .padStart(2, '0')}-${startToday.getDate().toString().padStart(2, '0')}`;
                         
-            const givenStartDateTime    = startFormattedDate+' 00:00:01'; // Replace with your datetime string
-            const modifiedStartDateTime = moment(givenStartDateTime).subtract(4, 'hours'); // Subtract 4 hours
+            const givenStartDateTime    = startFormattedDate+' 00:00:01';
+            const modifiedStartDateTime = moment(givenStartDateTime).subtract(4, 'hours');
             const start        = modifiedStartDateTime.format('YYYY-MM-DD HH:mm:ss')
             
             const endToday = new Date(end_date);
@@ -183,20 +185,20 @@ export const riderList = async (req, resp) => {
         const [emiratesResult] = await db.query('SELECT DISTINCT emirates FROM riders');
         
         return resp.json({
-            status: 1,
-            code: 200,
-            message: ["Rider list fetched successfully!"],
-            data: result.data,
-            emirates: emiratesResult,
-            total_page: result.totalPage,
-            total: result.total,
+            status     : 1,
+            code       : 200,
+            message    : ["Rider list fetched successfully!"],
+            data       : result.data,
+            emirates   : emiratesResult,
+            total_page : result.totalPage,
+            total      : result.total,
         });
     } catch (error) {
         console.error('Error fetching rider list:', error);
         return resp.status(500).json({
-            status: 0,
-            code: 500,
-            message: ['Error fetching rider list'],
+            status  : 0,
+            code    : 500,
+            message : ['Error fetching rider list'],
         });
     }
 };
@@ -306,20 +308,10 @@ export const deleteRider = async (req, resp) => {
     const {rider_id} = req.body 
     if (!rider_id) return resp.json({ status: 0, code: 422, message: "Rider ID is required" });
 
-    const connection = await db.getConnection();
-
     try {
-        await connection.beginTransaction();
         
-        const [[rider]] = await connection.execute('SELECT profile_img, rider_name, last_name, rider_email, country_code, rider_mobile, emirates, area, country, date_of_birth, added_from FROM riders WHERE rider_id = ?', [rider_id]);
+        const [[rider]] = await db.execute('SELECT profile_img, rider_name, last_name, rider_email, country_code, rider_mobile, emirates, area, country, date_of_birth, added_from FROM riders WHERE rider_id = ?', [rider_id]);
         if (rider.length === 0) return resp.json({ status: 0, message: 'Rider not found.' });
-
-        // const oldImagePath = path.join('uploads', 'rider_profile', rider[0].profile_img || '');
-        // fs.unlink(oldImagePath, (err) => {
-        //     if (err) {
-        //         console.error(`Failed to delete rider old image: ${oldImagePath}`, err);
-        //     }
-        // });
 
         const deleteQueries = [
             // 'DELETE FROM notifications                         WHERE receive_id = ?',
@@ -342,25 +334,23 @@ export const deleteRider = async (req, resp) => {
             // 'DELETE FROM board_views                           WHERE rider_id   = ?',
             'DELETE FROM riders                                WHERE rider_id   = ?'
         ];
-
         // Execute each delete query
         for (const query of deleteQueries) {
-            await connection.execute(query, [rider_id]);
+            await db.execute(query, [rider_id]);
         }
         await insertRecord('deleted_riders', [
             'rider_id', 'rider_name', 'last_name', 'rider_email', 'country_code', 'rider_mobile', 'emirates', 'area', 'country', 'profile_img', 'date_of_birth', 'added_from' 
         ],[
             rider_id, rider.rider_name, rider.last_name, rider.rider_email, rider.country_code, rider.rider_mobile,  rider.emirates, rider.area, rider.country, rider.profile_img, rider.date_of_birth, rider.added_from 
         ]);
-        await connection.commit();
 
         return resp.json({ status: 1, code: 200, error: false, message: ['Rider account deleted successfully!'] });
     } catch (err) {
-        await connection.rollback();
+        
         console.error('Error deleting rider account:', err.message);
         return resp.json({ status: 1, code: 500, error: true, message: ['Something went wrong. Please try again!'] });
     } finally {
-        connection.release();
+    
     }
 };
 
@@ -370,28 +360,27 @@ export const profileDetails = async (req, resp) => {
 
     if (!userId) {
         return resp.status(400).json({
-            status: 0,
-            code: 400,
-            message: 'User ID is required'
+            status  : 0,
+            code    : 400,
+            message : 'User ID is required'
         });
     }
-
     try {
         const [user] = (await db.execute('SELECT * FROM users WHERE email=? and id = ?', [email, userId]));
 
         resp.status(200).json({
-            message:"Profile Details",
-            code: 200, 
-            userDetails: user[0], 
-            base_url: `${req.protocol}://${req.get('host')}/uploads/profile-image/`,
+            message     :"Profile Details",
+            code        : 200, 
+            userDetails : user[0], 
+            base_url    : `${process.env.DIR_UPLOADS}profile-image/`,
         })
        
     } catch (error) {
         console.error('Error fetching profile details:', error);
         return resp.status(500).json({
-            status: 0,
-            code: 500,
-            message: 'Error fetching profile details',
+            status  : 0,
+            code    : 500,
+            message : 'Error fetching profile details',
         });
     }
 };

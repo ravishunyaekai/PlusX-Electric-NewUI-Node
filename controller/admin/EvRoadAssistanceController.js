@@ -1,9 +1,10 @@
 import db from "../../config/db.js";
 import { getPaginatedData, insertRecord, queryDB, updateRecord } from '../../dbUtils.js';
 import validateFields from "../../validation.js";
-import { createNotification, pushNotification,asyncHandler, formatDateTimeInQuery, formatDateInQuery, mergeParam } from '../../utils.js';
+import { createNotification, pushNotification,asyncHandler, formatDateTimeInQuery, mergeParam } from '../../utils.js';
 import moment from 'moment';
 import emailQueue from '../../emailQueue.js';
+// import { podDeviceStatusChange } from "./PodDeviceController.js"; formatDateInQuery,
 
 /* RA Booking */
 export const bookingList = asyncHandler(async (req, resp) => {
@@ -19,8 +20,8 @@ export const bookingList = asyncHandler(async (req, resp) => {
         const startFormattedDate = `${startToday.getFullYear()}-${(startToday.getMonth() + 1).toString()
             .padStart(2, '0')}-${startToday.getDate().toString().padStart(2, '0')}`;
                     
-        const givenStartDateTime    = startFormattedDate+' 00:00:01'; // Replace with your datetime string
-        const modifiedStartDateTime = moment(givenStartDateTime).subtract(4, 'hours'); // Subtract 4 hours
+        const givenStartDateTime    = startFormattedDate+' 00:00:01';
+        const modifiedStartDateTime = moment(givenStartDateTime).subtract(4, 'hours');
         const start                 = modifiedStartDateTime.format('YYYY-MM-DD HH:mm:ss')
         
         const endToday         = new Date(end_date);
@@ -69,8 +70,7 @@ export const bookingData = asyncHandler(async (req, resp) => {
         const booking = await queryDB(`
             SELECT 
                 request_id, rider_id, ${formatDateTimeInQuery(['created_at'])}, name, country_code, contact_no, order_status, pickup_address, pickup_latitude, pickup_longitude, ROUND(road_assistance.price/100, 2) AS price, parking_number, parking_floor, 
-                (select concat(rsa_name, ",", country_code, "-", mobile) from rsa where rsa.rsa_id = road_assistance.rsa_id) as rsa_data, 
-                (select concat(vehicle_model, "-", vehicle_make) from riders_vehicles as rv where rv.vehicle_id = road_assistance.vehicle_id) as vehicle_data,
+                (select concat(rsa_name, ",", country_code, "-", mobile) from rsa where rsa.rsa_id = road_assistance.rsa_id) as rsa_data, vehicle_id, vehicle_data,
                 (select pod_name from pod_devices as pd where pd.pod_id = road_assistance.pod_id) as pod_name
             FROM 
                 road_assistance 
@@ -81,6 +81,20 @@ export const bookingData = asyncHandler(async (req, resp) => {
         if (booking.length === 0) {
             return resp.json({ status : 0, code : 404, message : ['Booking not found.'] });
         } 
+        if(booking.vehicle_data == '' || booking.vehicle_data == null) {
+            const vehicledata = await queryDB(`
+                SELECT                 
+                    vehicle_make, vehicle_model, vehicle_specification, emirates, vehicle_code, vehicle_number
+                FROM 
+                    riders_vehicles
+                WHERE 
+                    rider_id = ? and vehicle_id = ? 
+                LIMIT 1 `,
+            [ rider_id, booking.vehicle_id ]);
+            if(vehicledata) {
+                booking.vehicle_data = vehicledata.vehicle_make + ", " + vehicledata.vehicle_model+ ", "+ vehicledata.vehicle_specification+ ", "+ vehicledata.emirates+ "-" + vehicledata.vehicle_code + "-"+ vehicledata.vehicle_number ;
+            }
+        }
         const [bookingHistory] = await db.execute(`
             SELECT 
                 order_status, cancel_by, cancel_reason as reason, rsa_id, ${formatDateTimeInQuery(['created_at'])}, image, remarks,   
@@ -91,7 +105,7 @@ export const bookingData = asyncHandler(async (req, resp) => {
                 order_id = ?`, 
             [request_id]
         );
-        booking.imageUrl = `${req.protocol}://${req.get('host')}/uploads/road-assistance/`;
+        booking.imageUrl = `${process.env.DIR_UPLOADS}road-assistance/`;
         
         const feedBack = await queryDB(`
             SELECT 
@@ -161,14 +175,13 @@ export const invoiceList = asyncHandler(async (req, resp) => {
     const whereOperators = []
 
     if (start_date && end_date) {
-        // const start = moment(start_date, "YYYY-MM-DD").startOf('day').format("YYYY-MM-DD HH:mm:ss");
-        // const end = moment(end_date, "YYYY-MM-DD").endOf('day').format("YYYY-MM-DD HH:mm:ss");
+    
         const startToday         = new Date(start_date);
         const startFormattedDate = `${startToday.getFullYear()}-${(startToday.getMonth() + 1).toString()
             .padStart(2, '0')}-${startToday.getDate().toString().padStart(2, '0')}`;
                     
-        const givenStartDateTime    = startFormattedDate+' 00:00:01'; // Replace with your datetime string
-        const modifiedStartDateTime = moment(givenStartDateTime).subtract(4, 'hours'); // Subtract 4 hours
+        const givenStartDateTime    = startFormattedDate+' 00:00:01';
+        const modifiedStartDateTime = moment(givenStartDateTime).subtract(4, 'hours'); 
         const start                 = modifiedStartDateTime.format('YYYY-MM-DD HH:mm:ss')
         
         const endToday         = new Date(end_date);
@@ -210,40 +223,29 @@ export const invoiceData = async (req, resp) => {
     const { isValid, errors } = validateFields(req.body, { invoice_id: ["required"] });
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
 
-    // rs.start_charging_level, rs.end_charging_level, 
     const data = await queryDB(`
         SELECT 
             invoice_id, invoice_date, currency, 
-            rs.name, rs.request_id, 
+            rs.name, rs.request_id, rs.current_percent,
             (SELECT coupan_percentage FROM coupon_usage WHERE booking_id = pci.request_id) AS discount,
-            (SELECT roadside_assistance_price FROM booking_price LIMIT 1) as booking_price
+            (SELECT roadside_assistance_price FROM booking_price LIMIT 1) as booking_price,
+            (SELECT rsa_additional_price FROM booking_price LIMIT 1) as additional_price
         FROM 
             road_assistance_invoice AS pci 
         LEFT JOIN 
             road_assistance AS rs ON rs.request_id = pci.request_id
         WHERE pci.invoice_id = ?
     `, [invoice_id]);
-
-    data.invoice_url = `${req.protocol}://${req.get('host')}/public/road-side-invoice/${invoice_id}-invoice.pdf`;
-
-    // const chargingLevels = ['start_charging_level', 'end_charging_level'].map(key => 
-    //     data[key] ? data[key].split(',').map(Number) : []
-    // );
-    // const chargingLevelSum = chargingLevels[0].reduce((sum, startLevel, index) => sum + (startLevel - chargingLevels[1][index]), 0);
-    
-    data.kw           = 7; //chargingLevelSum * 0.25;
+    // data.booking_price = 90;  
+    data.kw           = 7; 
     data.kw_dewa_amt  = data.kw * 0.44;
     data.kw_cpo_amt   = data.kw * 0.26;
-    data.delv_charge  = (parseFloat( data.booking_price) - (data.kw_dewa_amt + data.kw_cpo_amt) ); //when start accepting payment
-    // data.t_vat_amt    = ( (data.kw_dewa_amt + data.kw_cpo_amt  + data.delv_charge )  * 5) / 100 ;
-    // data.price        = data.kw_dewa_amt + data.kw_cpo_amt + data.delv_charge + data.t_vat_amt;
-    // data.dis_price    = 0;
-    // if(data.discount > 0){
-    //     const dis_price = ( data.price  * data.discount ) /100
-    //     data.dis_price  = dis_price;
-    //     data.price      = data.price - dis_price;
-    // } 
-    data.dis_price    = 0;
+    data.delv_charge  = (parseFloat( data.booking_price) - (data.kw_dewa_amt + data.kw_cpo_amt) ); 
+
+    if(data.current_percent == 0){
+        data.booking_price = (parseFloat( data.booking_price) + parseFloat(data.additional_price) ); 
+    }
+    data.dis_price = 0;
     if(data.discount > 0){
         if ( data.discount != parseFloat(100) ) {  
             const dis_price = ( parseFloat( data.booking_price) * data.discount ) /100 ;
@@ -281,8 +283,6 @@ export const rsaAssignBooking = async (req, resp) => {
         booking_id : ["required"],
     });
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
-    
-    // const conn = await startTransaction(); 
     
     try { 
         const booking_data = await queryDB( `SELECT rider_id, rsa_id, (select fcm_token from riders as r where r.rider_id = road_assistance.rider_id ) as fcm_token FROM road_assistance WHERE request_id = ?
@@ -323,7 +323,6 @@ export const rsaAssignBooking = async (req, resp) => {
         </html>`;
         emailQueue.addEmail(rsa.email, 'PlusX Electric App: Booking Confirmation for Your EV Roadside Assistance!', htmlDriver);
         
-        // await commitTransaction(conn);
         return resp.json({
             status  : 1, 
             code    : 200,
@@ -331,11 +330,11 @@ export const rsaAssignBooking = async (req, resp) => {
         });
 
     } catch(err){
-        // await rollbackTransaction(conn);
+        
         console.error("Transaction failed:", err);
         return resp.json({status: 0, code: 500, message: ["Oops! There is something went wrong! Please Try Again"] });
     } finally {
-        // if (conn) conn.release();
+        
     }
 };
 
@@ -370,8 +369,8 @@ export const failedRSABookingList = async (req, resp) => {
             const startFormattedDate = `${startToday.getFullYear()}-${(startToday.getMonth() + 1).toString()
                 .padStart(2, '0')}-${startToday.getDate().toString().padStart(2, '0')}`;
                        
-            const givenStartDateTime    = startFormattedDate+' 00:00:01'; // Replace with your datetime string
-            const modifiedStartDateTime = moment(givenStartDateTime).subtract(4, 'hours'); // Subtract 4 hours
+            const givenStartDateTime    = startFormattedDate+' 00:00:01';
+            const modifiedStartDateTime = moment(givenStartDateTime).subtract(4, 'hours');
             const start        = modifiedStartDateTime.format('YYYY-MM-DD HH:mm:ss')
             
             const endToday = new Date(end_date);
@@ -407,8 +406,7 @@ export const failedRSABookingDetails = async (req, resp) => {
         } 
         const [[bookingResult]] = await db.execute(`
             SELECT 
-                request_id, ${formatDateTimeInQuery(['created_at'])}, name, country_code, contact_no, order_status, pickup_address, pickup_latitude, pickup_longitude, parking_number, parking_floor, ROUND(price/100, 2) AS price,
-                (select concat(vehicle_model, "-", vehicle_make) from riders_vehicles as rv where rv.vehicle_id = failed_road_assistance.vehicle_id) as vehicle_data
+                request_id, ${formatDateTimeInQuery(['created_at'])}, name, country_code, contact_no, order_status, pickup_address, pickup_latitude, pickup_longitude, parking_number, parking_floor, ROUND(price/100, 2) AS price, vehicle_id, vehicle_data
             FROM 
                 failed_road_assistance 
             WHERE 
@@ -418,6 +416,20 @@ export const failedRSABookingDetails = async (req, resp) => {
         if (bookingResult.length === 0) {
             return resp.json({ status : 0, code : 404, message : ['Booking not found.'] });
         } 
+        if(bookingResult.vehicle_data == '' || bookingResult.vehicle_data == null) {
+            const vehicledata = await queryDB(`
+                SELECT                 
+                    vehicle_make, vehicle_model, vehicle_specification, emirates, vehicle_code, vehicle_number
+                FROM 
+                    riders_vehicles
+                WHERE 
+                    rider_id = ? and vehicle_id = ? 
+                LIMIT 1 `,
+            [ rider_id, bookingResult.vehicle_id ]);
+            if(vehicledata) {
+                bookingResult.vehicle_data = vehicledata.vehicle_make + ", " + vehicledata.vehicle_model+ ", "+ vehicledata.vehicle_specification+ ", "+ vehicledata.emirates+ "-" + vehicledata.vehicle_code + "-"+ vehicledata.vehicle_number ;
+            }
+        }
         return resp.json({
             status  : 1,
             code    : 200,

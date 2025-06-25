@@ -28,7 +28,7 @@ export const carList = asyncHandler(async (req, resp) => {
         data: result.data,
         total_page: result.totalPage,
         total: result.total,
-        base_url: `${req.protocol}://${req.get('host')}/uploads/car-rental-images/`,
+        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/car-rental-images/`,
     });
 });
 
@@ -48,6 +48,6 @@ export const carDetail = asyncHandler(async (req, resp) => {
         message: ["Car Rental Details fetched successfully!"],
         data: rentalData,
         gallery_data: imgName,
-        base_url: `${req.protocol}://${req.get('host')}/uploads/car-rental-images/`,
+        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/car-rental-images/`,
     });
 });

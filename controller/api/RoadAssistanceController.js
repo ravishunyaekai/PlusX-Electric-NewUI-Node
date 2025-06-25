@@ -22,7 +22,7 @@ const storage = multer.diskStorage({
 export const upload = multer({ storage: storage });
 
 export const addRoadAssistance = asyncHandler(async (req, resp) => {
-    const { rider_id, user_name, country_code, contact_no, address, latitude, longitude, vehicle_id, address_id, parking_number='', parking_floor ='', service_price= 0, device_name = '', coupon_code='', battery_percent = 0
+    const { rider_id, user_name, country_code, contact_no, address, latitude, longitude, vehicle_id, address_id, parking_number='', parking_floor ='', service_price= 0, device_name = '', coupon_code='', battery_percent = 1
     } = mergeParam(req);
 
     const { isValid, errors } = validateFields(mergeParam(req), {
@@ -39,10 +39,11 @@ export const addRoadAssistance = asyncHandler(async (req, resp) => {
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
 
     try {
+        //  (SELECT count(id) from riders_vehicles where rider_id =? and vehicle_id = ? ) as vehicle_count,
         const riderAddress = await queryDB(`
             SELECT 
                 landmark,
-                (SELECT count(id) from riders_vehicles where rider_id =? and vehicle_id = ? ) as vehicle_count,
+                (SELECT CONCAT(vehicle_make, ", ", vehicle_model, ", ", vehicle_specification, ", ", emirates, "-", vehicle_code, "-", vehicle_number) FROM riders_vehicles where rider_id =? and vehicle_id = ? ) AS vehicle_data,
                 ( SELECT roadside_assistance_price FROM booking_price LIMIT 1) as booking_price,
                 (
                     CASE 
@@ -59,7 +60,7 @@ export const addRoadAssistance = asyncHandler(async (req, resp) => {
         [ rider_id, vehicle_id, battery_percent, rider_id, address_id ]);
 
         if(!riderAddress) return resp.json({ message : ["Address Id not valid!"], status: 0, code: 422, error: true });
-        if(riderAddress.vehicle_count == 0) return resp.json({ message : ["Vehicle Id not valid!"], status: 0, code: 422, error: true });
+        if(riderAddress.vehicle_data == '') return resp.json({ message : ["Vehicle Id not valid!"], status: 0, code: 422, error: true });
 
         const additional_price = (battery_percent == 0 ) ? parseFloat(riderAddress.additional_price) : 0.0 ;
         const booking_price    = parseFloat(riderAddress.booking_price) + additional_price 
@@ -67,11 +68,11 @@ export const addRoadAssistance = asyncHandler(async (req, resp) => {
         const bookingPrice     = Math.floor( ( parseFloat(booking_price) + parseFloat(vatAmt) ) * 100) ;
 
         if(parseFloat(service_price) != bookingPrice && coupon_code == '') { 
-            return resp.json({ message : ['Coupon code is required'], status: 0, code: 422, error: true });
+            return resp.json({ message : ['Booking price is not valid!'], status: 0, code: 422, error: true });
         }
         else if(parseFloat(service_price) != bookingPrice && coupon_code) {
             const servicePrice = parseFloat(service_price) ;
-            const couponData   = await checkCoupon(rider_id, 'Roadside Assistance', coupon_code, bookingPrice);
+            const couponData   = await checkCoupon(rider_id, 'Roadside Assistance', coupon_code, booking_price);
             
             if(couponData.status == 0 ){
                 return resp.json({ message : [couponData.message], status: 0, code: 422, error: true });
@@ -80,12 +81,13 @@ export const addRoadAssistance = asyncHandler(async (req, resp) => {
                 return resp.json({ message : ['Booking price is not valid!'], status: 0, code: 422, error: true, bookingPrice, servicePrice, couponprice : couponData.service_price });
             }
         }  
-        const area   = riderAddress.landmark;
+        const area         = riderAddress.landmark;
+        const vehicle_data = riderAddress.vehicle_data;
         
         const insert = await insertRecord('road_assistance', [
-            'request_id', 'rider_id', 'name', 'country_code', 'contact_no', 'address_id', 'pickup_address', 'pickup_latitude', 'pickup_longitude', 'parking_number', 'parking_floor', 'vehicle_id', 'price', 'order_status', 'device_name', 'area'
+            'request_id', 'rider_id', 'name', 'country_code', 'contact_no', 'address_id', 'pickup_address', 'pickup_latitude', 'pickup_longitude', 'parking_number', 'parking_floor', 'vehicle_id', 'price', 'order_status', 'device_name', 'area', 'current_percent', 'vehicle_data'
         ], [
-            'RAO', rider_id, user_name, country_code, contact_no, address_id, address, latitude, longitude, parking_number, parking_floor, vehicle_id, service_price, 'PNR', device_name, area
+            'RAO', rider_id, user_name, country_code, contact_no, address_id, address, latitude, longitude, parking_number, parking_floor, vehicle_id, service_price, 'PNR', device_name, area, battery_percent, vehicle_data
         ]);
 
         if(insert.affectedRows === 0) return resp.json({status:0, code:200, message: ['Oops! There is something went wrong! Please Try Again.']});
@@ -160,7 +162,7 @@ export const roadAssistanceList = asyncHandler(async (req, resp) => {
         total_page : totalPage,
         total      : total,
         inProcessBookingList,
-        base_url   : `${req.protocol}://${req.get('host')}/uploads/road-assistance/`,
+        base_url   : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/road-assistance/`,
         noResultMsg : 'There are no recent bookings. Please schedule your booking now.'
     });
 });
@@ -174,10 +176,8 @@ export const roadAssistanceDetail = asyncHandler(async (req, resp) => {
 
     const [roadAssistance] = await db.execute(`
         SELECT 
-            request_id, name, country_code, contact_no, pickup_address, order_status, ROUND(road_assistance.price/100, 2) AS price,
-            ${formatDateTimeInQuery(['created_at'])},
-            (select concat(rsa_name, ",", country_code, " ", mobile) from rsa where rsa.rsa_id = road_assistance.rsa_id) as rsa_data,
-            (select concat(vehicle_make, ", ", vehicle_model, ", ", vehicle_specification, ", ", emirates, "-", vehicle_code, "-", vehicle_number) from riders_vehicles as rv where rv.vehicle_id = road_assistance.vehicle_id limit 1) as vehicle_data
+            request_id, name, country_code, contact_no, pickup_address, order_status, ROUND(road_assistance.price/100, 2) AS price, ${formatDateTimeInQuery(['created_at'])},
+            (select concat(rsa_name, ",", country_code, " ", mobile) from rsa where rsa.rsa_id = road_assistance.rsa_id) as rsa_data, vehicle_id, vehicle_data
         FROM 
             road_assistance 
         WHERE 
@@ -196,11 +196,18 @@ export const roadAssistanceDetail = asyncHandler(async (req, resp) => {
         ORDER BY id DESC
     `,[order_id]);
 
-    if(roadAssistance.length > 0){
-        roadAssistance[0].invoice_url = '';
-        if (roadAssistance[0].order_status == 'PU' || roadAssistance[0].order_status == 'RO') {
-            const invoice_id              = roadAssistance[0].request_id.replace('RAO', 'INVR');
-            roadAssistance[0].invoice_url = `${req.protocol}://${req.get('host')}/public/road-side-invoice/${invoice_id}-invoice.pdf`;
+    if(roadAssistance.vehicle_data == '' || roadAssistance.vehicle_data == null) {
+        const vehicledata = await queryDB(`
+            SELECT                 
+                vehicle_make, vehicle_model, vehicle_specification, emirates, vehicle_code, vehicle_number
+            FROM 
+                riders_vehicles
+            WHERE 
+                rider_id = ? and vehicle_id = ? 
+            LIMIT 1 `,
+        [ rider_id, roadAssistance.vehicle_id ]);
+        if(vehicledata) {
+            roadAssistance.vehicle_data = vehicledata.vehicle_make + ", " + vehicledata.vehicle_model+ ", "+ vehicledata.vehicle_specification+ ", "+ vehicledata.emirates+ "-" + vehicledata.vehicle_code + "-"+ vehicledata.vehicle_number ;
         }
     }
     return resp.json({
@@ -245,7 +252,7 @@ export const roadAssistanceInvoiceList = asyncHandler(async (req, resp) => {
         data       : result.data,
         total_page : result.totalPage,
         total      : result.total,
-        base_url   : `${req.protocol}://${req.get('host')}/uploads/road-side-invoice/`,
+        base_url   : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/road-side-invoice/`,
     });
 });
 
@@ -265,7 +272,7 @@ export const roadAssistanceInvoiceDetail = asyncHandler(async (req, resp) => {
             rsi.invoice_id = ?
     `, [invoice_id]);
 
-    invoice.invoice_url = `${req.protocol}://${req.get('host')}/public/road-side-invoice/${invoice_id}-invoice.pdf`;
+    invoice.invoice_url = `https://plusx.s3.ap-south-1.amazonaws.com/public/road-side-invoice/${invoice_id}-invoice.pdf`;
     return resp.json({
         message : ["Road Assistance Invoice Details fetch successfully!"],
         data    : invoice,

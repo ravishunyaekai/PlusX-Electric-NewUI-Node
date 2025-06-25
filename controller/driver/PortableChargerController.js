@@ -78,7 +78,7 @@ export const rsaBookingStage = asyncHandler(async (req, resp) => {
         booking_status: booking.status,
         execution_time: humanReadableDuration,
         booking_history: bookingTracking,
-        image_path: `${req.protocol}://${req.get('host')}/uploads/portable-charger/`
+        image_path: `${process.env.DIR_UPLOADS}portable-charger/`
     });
     
 });

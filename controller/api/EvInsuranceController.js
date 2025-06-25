@@ -136,7 +136,7 @@ export const insuranceList = asyncHandler(async (req, resp) => {
         data: result.data,
         total_page: result.totalPage,
         total: result.total,
-        base_url: `${req.protocol}://${req.get('host')}/uploads/pick-drop-invoice/`,
+        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/pick-drop-invoice/`,
     });
 });
 

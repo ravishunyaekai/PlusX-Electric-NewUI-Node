@@ -32,7 +32,7 @@ export const bikeList = asyncHandler(async (req, resp) => {
         data: result.data,
         total_page: result.totalPage,
         total: result.total,
-        base_url: `${req.protocol}://${req.get('host')}/uploads/bike-rental-images/`,
+        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/bike-rental-images/`,
     });
 });
 
@@ -52,6 +52,6 @@ export const bikeDetail = asyncHandler(async (req, resp) => {
         message: ["Bike Rental Details fetched successfully!"],
         data: rentalData,
         gallery_data: imgName,
-        base_url: `${req.protocol}://${req.get('host')}/uploads/bike-rental-images/`,
+        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/bike-rental-images/`,
     });
 });

@@ -70,8 +70,8 @@ export const carDetail = asyncHandler(async (req, resp) => {
          message: "Car Detail fetch successfully",
          car, 
          galleryData : imgName,
-         galleryId : imgId,
-         base_url: `${req.protocol}://${req.get('host')}/uploads/car-rental-images/`
+         galleryId   : imgId,
+         base_url    : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/car-rental-images/`
         });
 });
 

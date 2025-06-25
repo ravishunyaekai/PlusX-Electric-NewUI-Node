@@ -42,7 +42,7 @@ export const getRsaBookingStage = asyncHandler(async (req, resp) => {
         booking_status  : booking.order_status,
         execution_time  : humanReadableDuration,
         booking_history : bookingTracking,
-        image_path      : `${req.protocol}://${req.get('host')}/uploads/pick-drop-images/`
+        image_path      : `${process.env.DIR_UPLOADS}pick-drop-images/`
     });
 });
 

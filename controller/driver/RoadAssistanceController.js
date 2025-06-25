@@ -44,7 +44,7 @@ export const getRsaOrderStage = asyncHandler(async (req, resp) => {
         booking_status  : booking.status,
         execution_time  : humanReadableDuration,
         booking_history : bookingTracking,
-        image_path      : `${req.protocol}://${req.get('host')}/uploads/road-assistance/`
+        image_path      : `${process.env.DIR_UPLOADS}road-assistance/`
     });
     
 });
@@ -544,12 +544,12 @@ const rsaInvoice = async (rider_id, request_id ) => {
             createObj.charge_id         = charge.id;  
             createObj.transaction_id    = charge.payment_method_details.card.three_d_secure?.transaction_id || null;  
             createObj.payment_type      = charge.payment_method_details.type;  
-            createObj.currency          = charge.currency;  
+            createObj.currency          = charge.currency;
             createObj.invoice_date      = moment.unix(charge.created).format('YYYY-MM-DD HH:mm:ss');
             createObj.receipt_url       = charge.receipt_url;
             createObj.card_data         = cardData;
         }
-        // console.log(createObj);
+        // console.log(createObj); 
         const columns = Object.keys(createObj);
         const values  = Object.values(createObj);
         const insert  = await insertRecord('road_assistance_invoice', columns, values);

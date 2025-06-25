@@ -43,7 +43,7 @@ export const clubData = asyncHandler(async (req, resp) => {
         location,
         ageGroup,
         clubCategory,
-        base_url: `${req.protocol}://${req.get('host')}/uploads/club-images/`
+        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/club-images/`
     }
     if(club_id){
         result.club = club;
