@@ -6,6 +6,9 @@ import moment from 'moment';
 import emailQueue from '../../emailQueue.js';
 // import { podDeviceStatusChange } from "./PodDeviceController.js"; formatDateInQuery,
 
+import dotenv from 'dotenv';
+dotenv.config();
+
 /* RA Booking */
 export const bookingList = asyncHandler(async (req, resp) => {
     const { start_date, end_date, search_text = '', status, page_no, rowSelected } = req.body;

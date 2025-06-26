@@ -2,6 +2,9 @@ import db from "../../config/db.js";
 import { queryDB } from '../../dbUtils.js';
 import validateFields from "../../validation.js";
 
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { mergeParam, getOpenAndCloseTimings, asyncHandler, getSingleRoute, getMultipleRoute} from '../../utils.js';
 
 export const stationList = asyncHandler(async (req, resp) => {

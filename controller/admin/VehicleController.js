@@ -1,16 +1,19 @@
 import { getPaginatedData, queryDB } from '../../dbUtils.js';
 import { asyncHandler, formatDateTimeInQuery } from '../../utils.js';
 
+import dotenv from 'dotenv';
+dotenv.config();
+
 export const sellVehicleList = asyncHandler(async (req, resp) => {
     const { search_text, page_no } = req.body;
 
     const result = await getPaginatedData({
-        tableName: 'vehicle_sell',
-        columns: `sell_id, region, milage, price, body_type, engine_capacity, car_images, vehicle_id,
-                  (select concat(vehicle_model, "-", vehicle_make) from riders_vehicles as rv 
-                  where rv.vehicle_id = vehicle_sell.vehicle_id) as vehicle_data,
-                  (select concat(rider_name, ",", country_code, "-", rider_mobile) from riders as r 
-                where r.rider_id = vehicle_sell.rider_id) as rider_data`,
+        tableName : 'vehicle_sell',
+        columns   : `sell_id, region, milage, price, body_type, engine_capacity, car_images, vehicle_id,
+            (select concat(vehicle_model, "-", vehicle_make) from riders_vehicles as rv 
+            where rv.vehicle_id = vehicle_sell.vehicle_id) as vehicle_data,
+            (select concat(rider_name, ",", country_code, "-", rider_mobile) from riders as r 
+            where r.rider_id = vehicle_sell.rider_id) as rider_data`,
         joinTable: 'riders',
         joinCondition: 'vehicle_sell.rider_id = riders.rider_id',
         liveSearchFields: ['riders.rider_name', 'vehicle_sell.body_type'],

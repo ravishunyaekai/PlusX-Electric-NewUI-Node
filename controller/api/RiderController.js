@@ -38,16 +38,16 @@ export const login = asyncHandler(async (req, resp) => {
     const [update] = await db.execute(`UPDATE riders SET access_token = ?, status = ?, fcm_token = ? WHERE rider_mobile = ?`, [token, 1, fcm_token, mobile]);
     if(update.affectedRows > 0){
         const result = {
-            image_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/rider_profile/`,
-            rider_id: rider.rider_id,
-            rider_name: rider.rider_name,
-            rider_email: rider.rider_email,
-            profile_img: rider.profile_img,
-            country_code: rider.country_code,
-            rider_mobile: rider.rider_mobile,
-            country: rider.country,
-            emirates: rider.emirates,
-            access_token: token
+            image_url    : `${process.env.DIR_UPLOADS}rider_profile/`,
+            rider_id     : rider.rider_id,
+            rider_name   : rider.rider_name,
+            rider_email  : rider.rider_email,
+            profile_img  : rider.profile_img,
+            country_code : rider.country_code,
+            rider_mobile : rider.rider_mobile,
+            country      : rider.country,
+            emirates     : rider.emirates,
+            access_token : token
         };
     
         return resp.json({status:1, code:200, message: ["Login successful"], result: result});
@@ -97,7 +97,7 @@ export const register = asyncHandler(async (req, resp) => {
     await db.execute('UPDATE riders SET rider_id = ? WHERE id = ?', [riderId, rider.insertId]);
     
     const result = {
-        image_url    : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/rider_profile/`,
+        image_url    : `${process.env.DIR_UPLOADS}rider_profile/`,
         rider_id     : riderId,
         rider_name   : first_name,
         last_name    : last_name,
@@ -210,10 +210,9 @@ export const verifyOTP = asyncHandler(async (req, resp) => {
     const token  = crypto.randomBytes(12).toString('hex');
     await updateRecord('riders', { access_token: token, status : 1, fcm_token, device_name }, ['rider_mobile', 'country_code'], [mobile, country_code]);
 
-    // let profileImg = riderData.profile_img ? `https://plusx.s3.ap-south-1.amazonaws.com/uploads/rider_profile/${riderData.profile_img}` : '';
     delOTP(fullMobile);
     let respResult = {
-        image_url     : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/rider_profile/`,
+        image_url     : `${process.env.DIR_UPLOADS}rider_profile/`,
         rider_id      : riderData.rider_id,
         rider_name    : riderData.rider_name,
         last_name     : riderData.last_name,
@@ -328,13 +327,12 @@ export const home = asyncHandler(async (req, resp) => {
     });
 });
 
-
 export const getRiderData = asyncHandler(async(req, resp) => {
     const {rider_id} = mergeParam(req);
     if (!rider_id) return resp.json({ status: 0, code: 422, message: ["Rider Id is required"] });
     
     const rider = await queryDB(`SELECT *, ${formatDateTimeInQuery(['created_at', 'updated_at'])}, ${formatDateInQuery(['date_of_birth'])} FROM riders WHERE rider_id=?`, [rider_id]);
-    rider.image_url = `https://plusx.s3.ap-south-1.amazonaws.com/uploads/rider_profile/`;
+    rider.image_url = `${process.env.DIR_UPLOADS}rider_profile/`;
 
     return resp.json({
         status  : 1, 

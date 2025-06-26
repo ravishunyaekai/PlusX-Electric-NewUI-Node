@@ -6,7 +6,7 @@ import ejs from 'ejs';
 import { insertRecord, queryDB } from "./dbUtils.js";
 import { GoogleAuth } from "google-auth-library";
 import { fileURLToPath } from 'url';
-import fs from 'fs';
+// import fs from 'fs';
 import dotenv from 'dotenv';
 import db from "./config/db.js";
 dotenv.config();

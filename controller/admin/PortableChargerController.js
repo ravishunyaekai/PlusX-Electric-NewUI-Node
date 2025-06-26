@@ -258,7 +258,7 @@ export const chargerBookingDetails = async (req, resp) => {
         if (!booking_id) {
             return resp.json({ status : 0, code : 400, message : ['Booking ID is required.'] });
         }
-        const [bookingResult] = await db.execute(`
+        const [[bookingResult]] = await db.execute(`
             SELECT 
                 booking_id, rider_id, ${formatDateTimeInQuery(['created_at'])}, user_name, country_code, contact_no, status, address, latitude, area,
                 longitude, service_name, service_price, service_type, service_feature, ${formatDateInQuery(['slot_date'])}, slot_time, parking_number, parking_floor, 
@@ -274,6 +274,7 @@ export const chargerBookingDetails = async (req, resp) => {
         if (bookingResult.length === 0) {
             return resp.json({ status : 0, code : 404, message : ['Booking not found.'] });
         } 
+        console.log(bookingResult.rider_id, bookingResult.vehicle_id)
         if(bookingResult.vehicle_data == '' || bookingResult.vehicle_data == null) {
             const vehicledata = await queryDB(`
                 SELECT                 
@@ -283,7 +284,7 @@ export const chargerBookingDetails = async (req, resp) => {
                 WHERE 
                     rider_id = ? and vehicle_id = ? 
                 LIMIT 1 `,
-            [ rider_id, bookingResult.vehicle_id ]);
+            [ bookingResult.rider_id, bookingResult.vehicle_id ]);
             if(vehicledata) {
                 bookingResult.vehicle_data = vehicledata.vehicle_make + ", " + vehicledata.vehicle_model+ ", "+ vehicledata.vehicle_specification+ ", "+ vehicledata.emirates+ "-" + vehicledata.vehicle_code + "-"+ vehicledata.vehicle_number ;
             }
@@ -298,7 +299,7 @@ export const chargerBookingDetails = async (req, resp) => {
                 booking_id = ? order by id asc`, 
             [booking_id]
         );
-        const bookingDetails = bookingResult[0];
+        const bookingDetails = bookingResult;
         const history        = bookingHistory ;
         const order_status = history.filter(item => item.order_status === 'CNF');
         if(order_status.length > 1) {
@@ -332,9 +333,9 @@ export const chargerBookingDetails = async (req, resp) => {
     } catch (error) {
         console.error('Error fetching booking details:', error);
         return resp.json({ 
-            status: 0, 
-            code: 500, 
-            message: 'Error fetching booking details' 
+            status  : 0, 
+            code    : 500, 
+            message : 'Error fetching booking details' 
         });
     }
 };

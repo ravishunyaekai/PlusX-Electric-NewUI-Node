@@ -22,13 +22,13 @@ export const offerList = asyncHandler(async (req, resp) => {
     });
 
     return resp.json({
-        status: 1,
-        code: 200,
-        message: ["Offer List fetched successfully!"],
-        data: result.data,
-        total_page: result.totalPage,
-        total: result.total,
-        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/offer/`,
+        status     : 1,
+        code       : 200,
+        message    : ["Offer List fetched successfully!"],
+        data       : result.data,
+        total_page : result.totalPage,
+        total      : result.total,
+        base_url   : `${process.env.DIR_UPLOADS}offer/`,
     });
 });
 
@@ -42,11 +42,11 @@ export const offerDetail = asyncHandler(async (req, resp) => {
     const offer = await queryDB(`SELECT *, ${formatDateTimeInQuery(['created_at', 'updated_at', 'offer_exp_date'])} FROM offer WHERE offer_id= ? LIMIT 1`, [offer_id]);
     
     return resp.json({
-        status: 1,
-        code: 200,
-        message: ["Offer Details fetched successfully!"],
-        data: offer,
-        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/offer/`,
+        status   : 1,
+        code     : 200,
+        message  : ["Offer Details fetched successfully!"],
+        data     : offer,
+        base_url : `${process.env.DIR_UPLOADS}offer/`,
     });
 });
 

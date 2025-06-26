@@ -41,7 +41,7 @@ export const login = async(req, resp) => {
             message     : "Login successfull",
             code        : 200, 
             userDetails : users[0], 
-            base_url    : `${process.env.DIR_UPLOADS}/profile-image/`,
+            base_url    : `${process.env.DIR_UPLOADS}profile-image/`,
             Token       : process.env.CUSTOM_TOKEN
         }) 
     } catch (error) {
@@ -50,7 +50,7 @@ export const login = async(req, resp) => {
         message     : error,
         code        : 500, 
         userDetails : {}, 
-        base_url    : `${process.env.DIR_UPLOADS}/profile-image/`,
+        base_url    : `${process.env.DIR_UPLOADS}profile-image/`,
         Token       : ''
     }) 
     }
