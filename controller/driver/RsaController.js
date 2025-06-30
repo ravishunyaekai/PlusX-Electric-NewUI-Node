@@ -112,7 +112,7 @@ export const rsaLogout = asyncHandler(async (req, resp) => {
     const rsa = queryDB(`SELECT EXISTS (SELECT 1 FROM rsa WHERE rsa_id = ?) AS rsa_exists`, [rsa_id]);
     if(!rsa) return resp.json({status:0, code:400, message: 'Rider ID Invalid!'});
 
-    const update = await updateRecord('rsa', {status:0, access_token: ""},['rsa_id'], [rsa_id]);
+    const update = await updateRecord('rsa', {status:0, access_token: "", fcm_token:""},['rsa_id'], [rsa_id]);
     
     if(update.affectedRows > 0){
         return resp.json({status: 1, code: 200, message: ['Logged out sucessfully']});
@@ -195,23 +195,102 @@ export const rsaHome = asyncHandler(async (req, resp) => {
     
     const rsaData = await queryDB(`
         SELECT 
-            status, booking_type, running_order,
-            (SELECT COUNT(*) FROM charging_service_assign WHERE rsa_id = ? AND status = 0) AS valet_count,
-            (SELECT COUNT(*) FROM portable_charger_booking_assign WHERE rsa_id = ? AND status = 0) AS pod_count,
-            (
-                (SELECT COUNT(*) FROM portable_charger_booking_assign WHERE rsa_id = ? AND status = 1) 
-                +
-                (SELECT COUNT(*) FROM charging_service_assign WHERE rsa_id = ? AND status = 1) 
-            ) AS running_order_count,
-            (SELECT COUNT(*) FROM charging_service_rejected WHERE rsa_id = ?) AS valet_rej,
-            (SELECT COUNT(*) FROM portable_charger_booking_rejected WHERE rsa_id = ?) AS pod_rejected,
-            (SELECT COUNT(*) FROM charging_service WHERE rsa_id = ? AND order_status IN ("WC", "C")) AS valet_completed,
-            (SELECT COUNT(*) FROM portable_charger_booking WHERE rsa_id = ? AND status IN ("PU", "C", "RO")) AS pod_completed,
-            (SELECT COUNT(*) FROM portable_charger_booking WHERE rsa_id = ? AND status = "C") AS pod_cancelled,
-            (SELECT COUNT(*) FROM charging_service WHERE rsa_id = ? AND order_status = "C") AS valet_cancelled
-        FROM rsa 
-        WHERE rsa_id = ? LIMIT 1
-    `, [rsa_id, rsa_id, rsa_id, rsa_id, rsa_id, rsa_id, rsa_id, rsa_id, rsa_id, rsa_id, rsa_id]);
+            r.status, 
+            r.booking_type,
+
+            COALESCE(pa.running, 0) + COALESCE(ca.running, 0) + COALESCE(rsaa.running, 0) AS running_order_count,
+
+            COALESCE(pa.pending, 0)   AS pod_count,
+            COALESCE(pr.rejected, 0)  AS pod_rejected,
+            COALESCE(pb.completed, 0) AS pod_completed,
+            COALESCE(pb.cancelled, 0) AS pod_cancelled,
+
+            COALESCE(ca.pending, 0)   AS valet_count,
+            COALESCE(cr.rejected, 0)  AS valet_rejected,
+            COALESCE(cs.completed, 0) AS valet_completed,
+            COALESCE(cs.cancelled, 0) AS valet_cancelled,
+
+            COALESCE(rsaa.pending, 0)  AS rsa_count,
+            COALESCE(0)                AS rsa_rejected,
+            COALESCE(rsb.completed, 0) AS rsa_completed,
+            COALESCE(rsb.cancelled, 0) AS rsa_cancelled
+
+        FROM rsa r
+
+            LEFT JOIN (
+                SELECT rsa_id,
+                    COUNT(CASE WHEN status = 1 THEN 1 END) AS running,
+                    COUNT(CASE WHEN status = 0 THEN 1 END) AS pending
+                FROM portable_charger_booking_assign
+                WHERE rsa_id = ?
+                GROUP BY rsa_id
+            ) pa ON pa.rsa_id = r.rsa_id
+
+            LEFT JOIN (
+                SELECT rsa_id,
+                    COUNT(*) AS rejected
+                FROM portable_charger_booking_rejected
+                WHERE rsa_id = ?
+                GROUP BY rsa_id
+            ) pr ON pr.rsa_id = r.rsa_id
+
+            LEFT JOIN (
+                SELECT rsa_id,
+                    COUNT(CASE WHEN status IN ('PU', 'CC', 'RO') THEN 1 END) AS completed,
+                    COUNT(CASE WHEN status = 'C' THEN 1 END) AS cancelled
+                FROM portable_charger_booking
+                WHERE rsa_id = ?
+                GROUP BY rsa_id
+            ) pb ON pb.rsa_id = r.rsa_id
+
+            LEFT JOIN (
+                SELECT rsa_id,
+                    COUNT(CASE WHEN status = 1 THEN 1 END) AS running,
+                    COUNT(CASE WHEN status = 0 THEN 1 END) AS pending
+                FROM charging_service_assign
+                WHERE rsa_id = ?
+                GROUP BY rsa_id
+            ) ca ON ca.rsa_id = r.rsa_id
+
+            LEFT JOIN (
+                SELECT rsa_id,
+                    COUNT(*) AS rejected
+                FROM charging_service_rejected
+                WHERE rsa_id = ?
+                GROUP BY rsa_id
+            ) cr ON cr.rsa_id = r.rsa_id
+
+            LEFT JOIN (
+                SELECT rsa_id,
+                    COUNT(CASE WHEN order_status IN ('WC', 'DO') THEN 1 END) AS completed,
+                    COUNT(CASE WHEN order_status = 'C' THEN 1 END) AS cancelled
+                FROM charging_service
+                WHERE rsa_id = ?
+                GROUP BY rsa_id
+            ) cs ON cs.rsa_id = r.rsa_id
+
+            LEFT JOIN (
+                SELECT rsa_id,
+                    COUNT(CASE WHEN status = 1 THEN 1 END) AS running,
+                    COUNT(CASE WHEN status = 0 THEN 1 END) AS pending
+                FROM order_assign
+                WHERE rsa_id = ?
+                GROUP BY rsa_id
+            ) rsaa ON rsaa.rsa_id = r.rsa_id
+
+            LEFT JOIN (
+                SELECT rsa_id,
+                    COUNT(CASE WHEN order_status IN ('PU', 'C', 'RO') THEN 1 END) AS completed,
+                    COUNT(CASE WHEN order_status = 'C' THEN 1 END) AS cancelled
+                FROM road_assistance
+                WHERE rsa_id = ?
+                GROUP BY rsa_id
+            ) rsb ON rsb.rsa_id = r.rsa_id
+
+        WHERE 
+            r.rsa_id = ?
+        LIMIT 1;
+    `, [rsa_id, rsa_id, rsa_id, rsa_id, rsa_id, rsa_id, rsa_id, rsa_id, rsa_id]);
 
     if (rsaData.length === 0) return resp.json({ message: "RSA data not found", status: 0 });
 
@@ -240,10 +319,14 @@ export const rsaHome = asyncHandler(async (req, resp) => {
                 (SELECT guideline FROM portable_charger_history pch WHERE pch.rider_id = pb.rider_id AND pch.order_status = 'CS' LIMIT 1),''
             ) AS guideline,
             DATE_FORMAT(portable_charger_booking_assign.slot_date_time, '%Y-%m-%d %H:%i:%s') AS slot_date_time
-        FROM portable_charger_booking_assign
-        LEFT JOIN portable_charger_booking AS pb ON pb.booking_id = portable_charger_booking_assign.order_id
-        WHERE portable_charger_booking_assign.rsa_id = ?
-        ORDER BY portable_charger_booking_assign.slot_date_time ASC
+        FROM 
+            portable_charger_booking_assign
+        LEFT JOIN 
+            portable_charger_booking AS pb ON pb.booking_id = portable_charger_booking_assign.order_id
+        WHERE 
+            portable_charger_booking_assign.rsa_id = ?
+        ORDER BY 
+            portable_charger_booking_assign.slot_date_time ASC
     `,[rsa_id]);
     const [rsaAssign] = await db.execute(`
         SELECT 
@@ -261,31 +344,37 @@ export const rsaHome = asyncHandler(async (req, resp) => {
             order_assign.id ASC
     `,[rsa_id]);
    
-    const { status, running_order, booking_type, valet_count, pod_count, running_order_count, valet_rej, pod_rejected, valet_completed, pod_completed, pod_cancelled, valet_cancelled } = rsaData;
-    const rsaStatus = (status === 1) ? 'Login' : (status === 2 || running_order > 0) ? 'Available' : 'Logout';
+    const { status, booking_type, valet_count, pod_count, running_order_count, valet_rejected, pod_rejected, valet_completed, pod_completed, pod_cancelled, valet_cancelled, rsa_count, rsa_rejected, rsa_completed, rsa_cancelled } = rsaData;
+    const rsaStatus = (status === 1) ? 'Login' : (status === 2 ) ? 'Available' : 'Logout';
     
     const result = {
         rsa_status    : rsaStatus,
         service_type  : booking_type,
-        valet_count,
-        pod_count,
         running_order_count,
-        valet_rejected_count  : valet_rej,
+
+        pod_count,
         pod_rejected_count    : pod_rejected,
-        valet_completed_count : valet_completed,
         pod_completed_count   : pod_completed,
-        valet_cancelled_count : valet_cancelled,
         pod_cancelled_count   : pod_cancelled,
-        assign_orders         : assignValet,
         pod_assign            : podAssign,
+
+        valet_count,
+        valet_rejected_count  : valet_rejected,
+        valet_completed_count : valet_completed,
+        valet_cancelled_count : valet_cancelled,
+        assign_orders         : assignValet,
+        
+        rsa_count,
+        rsa_rejected_count    : rsa_rejected,
+        rsa_completed_count   : rsa_completed,
+        rsa_cancelled_count   : rsa_cancelled,
         rsa_assign            : rsaAssign
     };
-
     return resp.json({
-        message: ["RSA Home Page Data"],
-        data: result,
-        status: 1,
-        code: 200
+        message : ["RSA Home Page Data"],
+        data    : result,
+        status  : 1,
+        code    : 200
     });
 });
 

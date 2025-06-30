@@ -309,7 +309,8 @@ export const rsaInvoice = asyncHandler(async (req, resp) => {
                     <p>Best regards,<br/> PlusX Electric Team </p>
                 </body>
             </html>`;
-            emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `EV Roadside Assistance Booking - ${request_id}`, htmlAdmin);
+            const adminEmails = [process.env.MAIL_POD_ADMIN, process.env.MAIL_CHINTAN, process.env.MAIL_NADIA];
+            emailQueue.addEmail(adminEmails, `EV Roadside Assistance Booking - ${request_id}`, htmlAdmin);
             
             // await commitTransaction(conn);
             let respMsg = 'We have received your booking and our team will reach out to you soon.'; 

@@ -262,8 +262,7 @@ export const riderDetails = async (req, resp) => {
             WHERE 
                 pcb.rider_id = ?
             ORDER BY 
-                pcb.created_at 
-            DESC
+                pcb.created_at DESC
             LIMIT 5`, 
             [riderId]
         );
@@ -279,9 +278,22 @@ export const riderDetails = async (req, resp) => {
             WHERE 
                 cs.rider_id = ?
             ORDER BY 
-                cs.created_at 
-            DESC
+                cs.created_at DESC
             LIMIT 5`,
+            [riderId]
+        );
+        const [rsaBookings] = await db.execute(
+            `SELECT 
+                request_id, vehicle_id, ROUND(price/100, 2) AS price, order_status, 
+                ${formatDateTimeInQuery(['created_at'])}, 
+                (SELECT rsa_name FROM rsa WHERE rsa_id = road_assistance.rsa_id) AS rsa_name 
+            FROM 
+                road_assistance 
+            WHERE 
+                rider_id = ?
+            ORDER BY 
+                created_at DESC 
+            LIMIT 5`, 
             [riderId]
         );
         const rider = {
@@ -294,8 +306,9 @@ export const riderDetails = async (req, resp) => {
 
             portableChargerBookings : chargerRows,
             pickAndDropBookings     : chargingServiceRows,
-            riderAddress            : riderAddress,
-            riderVehicles           : riderVehicles,
+            riderAddress,
+            riderVehicles,
+            rsaBookings 
         };
         return resp.json({ status : 1, code : 200, data : rider });
     } catch (error) {

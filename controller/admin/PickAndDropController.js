@@ -75,7 +75,7 @@ export const bookingDetails = async (req, resp) => {
         if (!request_id) {
             return resp.json({ status: 0, code: 400, message: 'Booking ID is required.'});
         }
-        const result = await db.execute(`
+        const [[result]] = await db.execute(`
             SELECT 
                 cs.request_id, cs.name, cs.country_code, cs.contact_no, cs.order_status, cs.pickup_address, ROUND(cs.price/100, 2) AS price, 
                 cs.parking_number, cs.parking_floor, cs.pickup_latitude, cs.pickup_longitude, 
@@ -112,7 +112,10 @@ export const bookingDetails = async (req, resp) => {
             FROM 
                 charging_service_history 
             WHERE 
-                service_id = ?`, 
+                service_id = ?
+            ORDER By 
+                id 
+            ASC`, 
         [request_id]);
 
         const feedBack = await queryDB(`
@@ -137,7 +140,7 @@ export const bookingDetails = async (req, resp) => {
             status  : 1,
             code    : 200,
             message : ["Pick and Drop booking details fetched successfully!"],
-            data    : result[0],
+            data    : result,
             history,
             imageUrl : `${process.env.DIR_UPLOADS}pick-drop-images/`,
             feedBack

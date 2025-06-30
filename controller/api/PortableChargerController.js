@@ -652,7 +652,10 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
             device_name         : device_name,
             rescheduled_booking : 1
         }
-        await updateRecord('portable_charger_booking', updtFields, ['booking_id', 'rider_id'], [booking_id, rider_id]); //, conn 
+        await updateRecord('portable_charger_booking', updtFields, ['booking_id', 'rider_id'], [booking_id, rider_id]); 
+
+        await updateRecord('portable_charger_booking_assign', {slot_date_time : fSlotDateTime}, ['order_id', 'rider_id'], [booking_id, rider_id]);
+        
         const insert = await insertRecord('portable_charger_history', ['booking_id', 'rider_id', 'order_status'], [booking_id, rider_id, 'CNF']);  //, conn
         
         if(insert.affectedRows == 0) return resp.json({status:0, code:200, message: ["Oops! Something went wrong. Please try again."]});

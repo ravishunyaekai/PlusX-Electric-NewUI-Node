@@ -361,6 +361,7 @@ export const cancelValetBooking = asyncHandler(async (req, resp) => {
 
     if( checkOrder.rsa_id) {
         await db.execute(`DELETE FROM charging_service_assign WHERE rider_id=? AND order_id = ?`, [rider_id, booking_id]);
+        pushNotification(checkOrder.rsa_fcm_token, title, message, 'RSAFCM', href); 
     }
     const html = `<html>
         <body>

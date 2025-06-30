@@ -376,8 +376,8 @@ export const updateProfile = asyncHandler(async (req, resp) => {
             rider_name : first_name, 
             last_name, 
             rider_email, 
-            country_code, 
-            rider_mobile, 
+            // country_code, 
+            // rider_mobile, 
             emirates, 
             profile_img : profile_image
         };

@@ -21,7 +21,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 const stripe     = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-
 const testFunc = async () => {
     console.log('Asunc hai ')
     return {status : 1} ;
@@ -100,7 +99,7 @@ export const getPaymentdetailsN = async (req, resp) => {
 
 export const stripeWebhook = async (request, response) => {
     
-    const endpointSecret = 'whsec_O6UAYbVwm2EOSUIDKt4sNZx0Xb0DRnDY';
+    const endpointSecret = process.env.STRIPE_WEBHOOKS_KEY;
     const sig            = request.headers['stripe-signature'];
     let event;
     // console.log('body :', request.body);
@@ -416,7 +415,8 @@ const rsaBookingConfirm = async (request_id, payment_intent_id, couponCode) => {
                     <p>Best regards,<br/> PlusX Electric Team </p>
                 </body>
             </html>`;
-            emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `EV Roadside Assistance Booking - ${request_id}`, htmlAdmin);
+            const adminEmails = [process.env.MAIL_POD_ADMIN, process.env.MAIL_CHINTAN, process.env.MAIL_NADIA];
+            emailQueue.addEmail(adminEmails, `EV Roadside Assistance Booking - ${request_id}`, htmlAdmin);
             
             // await commitTransaction(conn);
             return true;

@@ -211,27 +211,25 @@ export const evPreSaleBooking = asyncHandler(async (req, resp) => {
     const htmlUser = `<html>
         <body>
             <h4>Dear ${rider.rider_name},</h4>
-            <p>Thank you for using the PlusX Electric App for your Valet Charging service. We have successfully received your booking request. 
-            Below are the details of your roadside assistance booking:</p> <br />
-            <p>Booking Reference: ${bookingId}</p>
-            <p>Date & Time of Request: ${formattedDateTime}</p> 
-            <p>Pick Up Address: ${pickup_address}</p>                         
-            <p>Reason: ${reason_of_testing}</p><br/><br/>  
-            <p> Regards,<br/> The Friendly PlusX Electric Team </p>
+            <p>Thank you for using the PlusX Electric App for your Valet Charging service. We have successfully received your booking request. Below are the details of your roadside assistance booking:</p>
+            <p>Booking Reference      : ${bookingId}</p>
+            <p>Date & Time of Request : ${formattedDateTime}</p> 
+            <p>Pick Up Address        : ${pickup_address}</p>                         
+            <p>Reason                 : ${reason_of_testing}</p><br/><br/>  
+            <p>Best Regards,<br/> The Friendly PlusX Electric Team </p>
         </body>
     </html>`;
+    emailQueue.addEmail(rider.rider_email, 'Your EV-pre Sale Booking Confirmation - PlusX Electric App', htmlUser);
     const htmlAdmin = `<html>
         <body>
             <h4>Dear Admin,</h4>
             <p>We have received a new booking for our Valet Charging service. Below are the details:</p> 
-            <p>Customer Name : ${rider.rider_name}</p>
+            <p>Customer Name         : ${rider.rider_name}</p>
             <p>Pickup & Drop Address : ${pickup_address}</p>
-            <p>Booking Date & Time : ${formattedDateTime}</p> <br/>                        
-            <p> Best regards,<br/> PlusX Electric App </p>
+            <p>Booking Date & Time   : ${formattedDateTime}</p> <br/>                        
+            <p>Best regards,<br/> PlusX Electric App </p>
         </body>
     </html>`;
-
-    emailQueue.addEmail(rider.rider_email, 'Your EV-pre Sale Booking Confirmation - PlusX Electric App', htmlUser);
     emailQueue.addEmail(process.env.MAIL_ADMIN, `EV-pre Sale Booking - ${bookingId}`, htmlAdmin);
 
     return resp.json({

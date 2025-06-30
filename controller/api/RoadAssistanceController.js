@@ -147,11 +147,11 @@ export const roadAssistanceList = asyncHandler(async (req, resp) => {
         FROM 
             road_assistance 
         WHERE 
-            rider_id = ? AND order_status NOT IN (?, ?, ?, ?, ?) ${orderBy} 
+            rider_id = ? AND order_status NOT IN (?, ?, ?, ?, ?, ?) ${orderBy} 
         LIMIT 
             ${parseInt(start)}, ${parseInt(limit)}
     `;
-    const inProcessParams        = ['CNF', 'C', 'PU', 'RO', 'PNR'];
+    const inProcessParams        = ['CNF', 'C', 'PU', 'RO', 'PNR', 'CC'];
     const [inProcessBookingList] = await db.execute(inProcessQuery, [rider_id, ...inProcessParams]);
 
     return resp.json({
@@ -174,7 +174,7 @@ export const roadAssistanceDetail = asyncHandler(async (req, resp) => {
     
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
 
-    const [roadAssistance] = await db.execute(`
+    const [[roadAssistance]] = await db.execute(`
         SELECT 
             request_id, name, country_code, contact_no, pickup_address, order_status, ROUND(road_assistance.price/100, 2) AS price, ${formatDateTimeInQuery(['created_at'])},
             (select concat(rsa_name, ",", country_code, " ", mobile) from rsa where rsa.rsa_id = road_assistance.rsa_id) as rsa_data, vehicle_id, vehicle_data
@@ -212,7 +212,7 @@ export const roadAssistanceDetail = asyncHandler(async (req, resp) => {
     }
     return resp.json({
         message       : ["Road Assistance Details fetched successfully!"],
-        order_data    : roadAssistance[0],
+        order_data    : roadAssistance,
         order_history : history,
         status        : 1,
         code          : 200,
@@ -252,7 +252,7 @@ export const roadAssistanceInvoiceList = asyncHandler(async (req, resp) => {
         data       : result.data,
         total_page : result.totalPage,
         total      : result.total,
-        base_url   : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/road-side-invoice/`,
+        base_url   : `${process.env.DIR_UPLOADS}road-side-invoice/`,
     });
 });
 
@@ -271,8 +271,6 @@ export const roadAssistanceInvoiceDetail = asyncHandler(async (req, resp) => {
         WHERE 
             rsi.invoice_id = ?
     `, [invoice_id]);
-
-    invoice.invoice_url = `https://plusx.s3.ap-south-1.amazonaws.com/public/road-side-invoice/${invoice_id}-invoice.pdf`;
     return resp.json({
         message : ["Road Assistance Invoice Details fetch successfully!"],
         data    : invoice,

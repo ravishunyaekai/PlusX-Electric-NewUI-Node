@@ -52,9 +52,9 @@ export const serviceRequest = asyncHandler(async (req, resp) => {
             <body>
                 <h4>Dear ${name},</h4>
                 <p>Thank you for booking our Charger Installation service. We are pleased to confirm that we have successfully received your booking.</p>
-                <p>Booking Details:</p>
-                Service: EV Charger Installation<br>
-                Booking ID: ${requestId}
+                <p>Booking Details : </p>
+                <p>Service    : EV Charger Installation</p>
+                <p>Booking ID : ${requestId}</p>
                 <p>Our team will get in touch with you shortly to coordinate the installation and ensure a smooth experience.</p>
                 <p>If you have any questions or need assistance, feel free to reach out to us. We're here to help!</p>
                 <p>Thank you for choosing PlusX Electric. We look forward to serving you soon.</p>
@@ -66,14 +66,15 @@ export const serviceRequest = asyncHandler(async (req, resp) => {
         const htmlAdmin = `<html>
             <body>
                 <h4>Dear Admin,</h4>
-                <p>We have received a new booking for our Charging Installation service. Below are the details:</p> <br/>
+                <p>We have received a new booking for our Charging Installation service. Below are the details:</p>
                 <p>Customer Name  : ${name}</p>
                 <p>Address : ${address}</p>
                 <p>Booking Time   : ${formattedDateTime}</p> <br/>                        
-                <p> Best regards,<br/>PlusX Electric Team </p>
+                <p>Best regards,<br/>PlusX Electric Team </p>
             </body>
         </html>`;
-        emailQueue.addEmail(process.env.MAIL_ADMIN, `Charging Installation Booking - ${requestId}`, htmlAdmin);
+        const adminEmails = [process.env.MAIL_ADMIN, process.env.MAIL_CHINTAN, process.env.MAIL_NADIA];
+        emailQueue.addEmail(adminEmails, `Charging Installation Booking - ${requestId}`, htmlAdmin);
 
         return resp.json({
             status  : 1, 

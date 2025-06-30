@@ -95,12 +95,12 @@ export const handleFileUploadOld = (dirName, fileFields, requiredFields = [], ma
         await s3.upload(params).promise();
      
         return fileName;
-      };
- 
+    };
 
     export const handleFileUpload = ( dirName, fileFields, requiredFields = [], maxFiles = 10, allowedFileTypes = ['png', 'jpeg', 'jpg'] ) => {
         const storage = multer.memoryStorage(); // direct to s3
  
+        
         const fileFilter = (req, file, cb) => {
             const fileExtension = path.extname(file.originalname).slice(1).toLowerCase();
             if (!allowedFileTypes.includes(fileExtension)) {
@@ -110,14 +110,16 @@ export const handleFileUploadOld = (dirName, fileFields, requiredFields = [], ma
         };
         const upload = multer({
             storage,
-            limits: { fileSize: 10 * 1024 * 1024 }, //10 MB
+            limits   : { fileSize: 10 * 1024 * 1024 }, //10 MB
             fileFilter,
         });
         return (req, res, next) => {
+            
             const multerFields = fileFields.map(field => ({
-                name: field,
-                maxCount: maxFiles
+                name     : field,
+                maxCount : maxFiles
             }));
+            
             const uploadMethod = upload.fields(multerFields);
      
             uploadMethod(req, res, async (err) => {
@@ -133,9 +135,11 @@ export const handleFileUploadOld = (dirName, fileFields, requiredFields = [], ma
                     }
                   return res.status(422).json({ status: 0, code: 422, message: errorMsg });
                 }
-         
+                if (!req.files || Object.keys(req.files).length === 0) {
+                    return next();
+                }
                 try {
-         
+                    console.log( Object.keys(req.files) );
                     for (const field of Object.keys(req.files)) {
                         const originalFiles = req.files[field];
              
@@ -151,7 +155,7 @@ export const handleFileUploadOld = (dirName, fileFields, requiredFields = [], ma
          
                 } catch (uploadErr) {
                     console.error(' S3 Upload Error:', uploadErr);
-                    return res.status(500).json({ status: 0, image: uploadedUrls, message: 'Failed to upload to S3.' });
+                    return res.status(500).json({ status: 0, message: 'Failed to upload to S3.' });
                 }
             });
         };

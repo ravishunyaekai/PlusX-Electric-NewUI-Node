@@ -274,7 +274,6 @@ export const chargerBookingDetails = async (req, resp) => {
         if (bookingResult.length === 0) {
             return resp.json({ status : 0, code : 404, message : ['Booking not found.'] });
         } 
-        console.log(bookingResult.rider_id, bookingResult.vehicle_id)
         if(bookingResult.vehicle_data == '' || bookingResult.vehicle_data == null) {
             const vehicledata = await queryDB(`
                 SELECT                 
@@ -299,7 +298,6 @@ export const chargerBookingDetails = async (req, resp) => {
                 booking_id = ? order by id asc`, 
             [booking_id]
         );
-        const bookingDetails = bookingResult;
         const history        = bookingHistory ;
         const order_status = history.filter(item => item.order_status === 'CNF');
         if(order_status.length > 1) {
@@ -310,7 +308,7 @@ export const chargerBookingDetails = async (req, resp) => {
             const lastValue                 = matchingIndexes[matchingIndexes.length - 1];
             history[lastValue].order_status = 'RSB'
         }
-        bookingDetails.imageUrl = `${process.env.DIR_UPLOADS}portable-charger/`;
+        bookingResult.imageUrl = `${process.env.DIR_UPLOADS}portable-charger/`;
         const feedBack = await queryDB(`
             SELECT 
                 rating, description, ${formatDateTimeInQuery(['created_at'])} 
@@ -325,7 +323,7 @@ export const chargerBookingDetails = async (req, resp) => {
             code    : 200,
             message : ["Booking details fetched successfully!"],
             data : {
-                booking : bookingDetails,
+                booking : bookingResult,
                 history,
                 feedBack
             }, 

@@ -4,7 +4,6 @@ import validateFields from "../../validation.js";
 import { createNotification, pushNotification,asyncHandler, formatDateTimeInQuery, mergeParam } from '../../utils.js';
 import moment from 'moment';
 import emailQueue from '../../emailQueue.js';
-// import { podDeviceStatusChange } from "./PodDeviceController.js"; formatDateInQuery,
 
 import dotenv from 'dotenv';
 dotenv.config();
@@ -93,7 +92,7 @@ export const bookingData = asyncHandler(async (req, resp) => {
                 WHERE 
                     rider_id = ? and vehicle_id = ? 
                 LIMIT 1 `,
-            [ rider_id, booking.vehicle_id ]);
+            [ booking.rider_id, booking.vehicle_id ]);
             if(vehicledata) {
                 booking.vehicle_data = vehicledata.vehicle_make + ", " + vehicledata.vehicle_model+ ", "+ vehicledata.vehicle_specification+ ", "+ vehicledata.emirates+ "-" + vehicledata.vehicle_code + "-"+ vehicledata.vehicle_number ;
             }
