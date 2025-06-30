@@ -1,58 +1,25 @@
 
 import path from 'path';
 import { fileURLToPath } from 'url';
-import transporter from '../mailer.js';
-import fs from "fs";
+// import transporter from '../mailer.js';
+// import fs from "fs";
 import { insertRecord, queryDB, updateRecord } from '../dbUtils.js';
 import db from "../config/db.js";
 
 import moment from 'moment/moment.js';
 import emailQueue from '../emailQueue.js';
-import { createNotification, pushNotification, asyncHandler } from '../utils.js';
+import { createNotification, pushNotification } from '../utils.js'; //, asyncHandler
 
 import Stripe from "stripe";
 import dotenv from 'dotenv';
 dotenv.config();
-import axios from "axios";
+// import axios from "axios";
 
 import { tryCatchErrorHandler } from "../middleware/errorHandler.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 const stripe     = new Stripe(process.env.STRIPE_SECRET_KEY);
-
-const testFunc = async () => {
-    console.log('Asunc hai ')
-    return {status : 1} ;
-};
-
-export const getPaymentdetails = async (req, resp) => {
-    const sttat = testFunc();
-    console.log('sttat', sttat)
-    // const htmlFilePath = path.join(__dirname, "PlusXEmailer.html");
-    // const emailHtml = fs.readFileSync(htmlFilePath, "utf8");
-    // const emails = ['ravi@shunyaekai.tech', 'paramjeet@shunyaekai.tech'] ;
-    try { 
-        // const htmlUser = `<html>
-        //     <body>
-        //         <h4>Dear Team,</h4>
-        //         <p>This is tEsting mail for multiple sender address</p>                   
-        //     </body>
-        // </html>`;
-        // emailQueue.addEmail(emails, 'Testing Mails', htmlUser);
-        return resp.json({
-            message : "Mail send successfully",
-            status : sttat
-        });
-
-    } catch(err) {
-        console.log('Error in sending mail', err);
-        return resp.json({
-            message  : err,
-        });
-        
-    }
-};
 
 export const getPaymentSessionData = async (req, resp) => {
     
@@ -73,7 +40,7 @@ export const getPaymentSessionData = async (req, resp) => {
     }
 }
 
-export const getPaymentdetailsN = async (req, resp) => {
+export const getPaymentdetails = async (req, resp) => {
     
     const payment_intent_id = 'pi_3Rd99bKKO9oLX4Mk0d9iZUfK' ;
     console.log(moment.unix('1750680435').format('YYYY-MM-DD HH:mm:ss') );
@@ -116,8 +83,8 @@ export const stripeWebhook = async (request, response) => {
     const userId          = event.data.object.metadata?.user_id;
     const couponCode      = event.data.object.metadata?.coupon_code;
     const sessionId       = event.data.object.id;
-    const paymentIntentId = event.data.object.payment_intent;
-
+    const paymentIntentId = event.data.object.payment_intent || event.data.object.id;
+    
     switch (event.type) {
         case 'checkout.session.async_payment_failed':
             const checkoutSessionAsyncPaymentFailed = event.data.object;
@@ -151,7 +118,7 @@ export const stripeWebhook = async (request, response) => {
 };
 
 const BookingConfirm = async (bookingType, bookingId, paymentIntentId, couponCode) =>  {
-
+    
     switch (bookingType) {
         case 'PCB':
             await portableChargerBookingConfirm(bookingId, paymentIntentId, couponCode);
@@ -182,7 +149,7 @@ const portableChargerBookingConfirm = async (booking_id, payment_intent_id, coup
                 pcb.booking_id = ? AND pcb.status = 'PNR'
             LIMIT 1
         `,[ booking_id ]);
-
+        
         if (!checkOrder) {
             return false;
         }
@@ -355,7 +322,7 @@ const rsaBookingConfirm = async (request_id, payment_intent_id, couponCode) => {
         const checkOrder = await queryDB(`
             SELECT 
                 rsa.request_id, rsa.rider_id, rsa.name, rsa.country_code, rsa.contact_no, 
-                rsa.pickup_address, rsa.pickup_latitude, rsa.pickup_longitude,
+                rsa.pickup_address, rsa.pickup_latitude, rsa.pickup_longitude, 
                 rd.fcm_token, rd.rider_email, rsa.vehicle_data
             FROM 
                 road_assistance as rsa
@@ -439,14 +406,17 @@ export const failedPODBooking = async () => {
         // await conn.beginTransaction();
         // 1. Insert into destination table
         await db.query(`
-            INSERT INTO failed_portable_charger_booking (booking_id, rider_id, vehicle_id, service_name, service_price, service_type, service_feature, user_name, country_code, contact_no, slot, slot_date, slot_time, address, latitude, longitude, status, address_alert, parking_number, parking_floor, address_id, device_name, payment_intent_id)
+            INSERT INTO failed_portable_charger_booking (booking_id, rider_id, vehicle_id, service_name, service_price, service_type, service_feature, user_name, country_code, contact_no, slot, slot_date, slot_time, address, latitude, longitude, status, address_alert, parking_number, parking_floor, address_id, device_name, payment_intent_id, vehicle_data)
 
-            SELECT booking_id, rider_id, vehicle_id, service_name, service_price, service_type, service_feature, user_name, country_code, contact_no, slot, slot_date, slot_time, address, latitude, longitude, status, address_alert, parking_number, parking_floor, address_id, device_name, payment_intent_id FROM portable_charger_booking
-            WHERE status = ? AND created_at < NOW() - INTERVAL 10 MINUTE`, 
+            SELECT 
+                booking_id, rider_id, vehicle_id, service_name, service_price, service_type, service_feature, user_name, country_code, contact_no, slot, slot_date, slot_time, address, latitude, longitude, status, address_alert, parking_number, parking_floor, address_id, device_name, payment_intent_id, vehicle_data 
+            FROM 
+                portable_charger_booking
+            WHERE status = ? AND created_at < NOW() - INTERVAL 5 MINUTE`, 
         ['PNR']); 
     
         // 2. Delete from source table status payment_intent_id
-        await db.query( `DELETE FROM portable_charger_booking WHERE status = ? AND created_at < NOW() - INTERVAL 10 MINUTE`, ['PNR'] );
+        await db.query( `DELETE FROM portable_charger_booking WHERE status = ? AND created_at < NOW() - INTERVAL 5 MINUTE`, ['PNR'] );
     
         // await conn.commit();
         // console.log("POD Data moved successfully!");
@@ -470,14 +440,17 @@ export const failedValetBooking = async () => {
         // await conn.beginTransaction();
         // 1. Insert into destination table
         await db.query(`
-            INSERT INTO failed_charging_service (request_id, rider_id, name, country_code, contact_no, vehicle_id, slot, slot_date_time, pickup_address, parking_number, parking_floor, price, order_status, pickup_latitude, pickup_longitude, device_name, payment_intent_id)
+            INSERT INTO failed_charging_service (request_id, rider_id, name, country_code, contact_no, vehicle_id, slot, slot_date_time, pickup_address, parking_number, parking_floor, price, order_status, pickup_latitude, pickup_longitude, device_name, payment_intent_id, vehicle_data)
 
-            SELECT request_id, rider_id, name, country_code, contact_no, vehicle_id, slot, slot_date_time, pickup_address, parking_number, parking_floor, price, order_status, pickup_latitude, pickup_longitude, device_name, payment_intent_id FROM charging_service
-            WHERE order_status = ? AND created_at < NOW() - INTERVAL 10 MINUTE`, 
+            SELECT 
+                request_id, rider_id, name, country_code, contact_no, vehicle_id, slot, slot_date_time, pickup_address, parking_number, parking_floor, price, order_status, pickup_latitude, pickup_longitude, device_name, payment_intent_id, vehicle_data 
+            FROM 
+                charging_service
+            WHERE order_status = ? AND created_at < NOW() - INTERVAL 5 MINUTE`, 
         ['PNR']);
     
         // 2. Delete from source table status payment_intent_id
-        await db.query( `DELETE FROM charging_service WHERE order_status = ? AND created_at < NOW() - INTERVAL 10 MINUTE`, ['PNR'] );
+        await db.query( `DELETE FROM charging_service WHERE order_status = ? AND created_at < NOW() - INTERVAL 5 MINUTE`, ['PNR'] );
     
         // await conn.commit();
         // console.log("Valet Data moved successfully!");
@@ -502,16 +475,17 @@ export const failedRSABooking = async () => {
         // 1. Insert into destination table
         
         await db.query(`
-            INSERT INTO failed_road_assistance (request_id, rider_id, vehicle_id, price, name, country_code, contact_no, pickup_address, pickup_latitude, pickup_longitude, order_status, parking_number, parking_floor, address_id, device_name, payment_intent_id)
+            INSERT INTO failed_road_assistance (request_id, rider_id, vehicle_id, price, name, country_code, contact_no, pickup_address, pickup_latitude, pickup_longitude, order_status, parking_number, parking_floor, address_id, device_name, payment_intent_id, vehicle_data)
 
-            SELECT request_id, rider_id, vehicle_id, price, name, country_code, contact_no, pickup_address, pickup_latitude, pickup_longitude, order_status, parking_number, parking_floor, address_id, device_name, payment_intent_id FROM 
+            SELECT request_id, rider_id, vehicle_id, price, name, country_code, contact_no, pickup_address, pickup_latitude, pickup_longitude, order_status, parking_number, parking_floor, address_id, device_name, payment_intent_id, vehicle_data 
+            FROM 
                 road_assistance
             WHERE 
-                order_status = ? AND created_at < NOW() - INTERVAL 10 MINUTE`, 
+                order_status = ? AND created_at < NOW() - INTERVAL 5 MINUTE`, 
         ['PNR']);
     
         // 2. Delete from source table 
-        await db.query( `DELETE FROM road_assistance WHERE order_status = ? AND created_at < NOW() - INTERVAL 10 MINUTE`, ['PNR'] );
+        await db.query( `DELETE FROM road_assistance WHERE order_status = ? AND created_at < NOW() - INTERVAL 5 MINUTE`, ['PNR'] );
     
         // await conn.commit();
         // console.log("RSA Data moved successfully!");

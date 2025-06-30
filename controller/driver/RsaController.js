@@ -187,7 +187,6 @@ export const rsaStatusChange = asyncHandler(async (req, resp) => {
             message: update.affectedRows > 0 ? ['Status changed successfully'] : ['Failed to change status. Please Try Again']
         });
     }
-
 });
 
 export const rsaHome = asyncHandler(async (req, resp) => {

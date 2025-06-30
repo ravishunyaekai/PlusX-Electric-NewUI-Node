@@ -408,7 +408,7 @@ export const failedRSABookingDetails = async (req, resp) => {
         } 
         const [[bookingResult]] = await db.execute(`
             SELECT 
-                request_id, ${formatDateTimeInQuery(['created_at'])}, name, country_code, contact_no, order_status, pickup_address, pickup_latitude, pickup_longitude, parking_number, parking_floor, ROUND(price/100, 2) AS price, vehicle_id, vehicle_data
+                request_id, rider_id, ${formatDateTimeInQuery(['created_at'])}, name, country_code, contact_no, order_status, pickup_address, pickup_latitude, pickup_longitude, parking_number, parking_floor, ROUND(price/100, 2) AS price, vehicle_id, vehicle_data
             FROM 
                 failed_road_assistance 
             WHERE 
@@ -427,7 +427,7 @@ export const failedRSABookingDetails = async (req, resp) => {
                 WHERE 
                     rider_id = ? and vehicle_id = ? 
                 LIMIT 1 `,
-            [ rider_id, bookingResult.vehicle_id ]);
+            [ bookingResult.rider_id, bookingResult.vehicle_id ]);
             if(vehicledata) {
                 bookingResult.vehicle_data = vehicledata.vehicle_make + ", " + vehicledata.vehicle_model+ ", "+ vehicledata.vehicle_specification+ ", "+ vehicledata.emirates+ "-" + vehicledata.vehicle_code + "-"+ vehicledata.vehicle_number ;
             }

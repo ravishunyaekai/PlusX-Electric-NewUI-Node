@@ -46,7 +46,7 @@ export const createIntent = async (req, resp) => {
                     country     : "United Arab Emirates",
                 },
                 email       : rider_email,
-                description : `This booking Id : ${booking_id} for POD Booking.`
+                // description : `This booking Id : ${booking_id} for POD Booking.`
             });
             customerId = customer.id;
         }
@@ -55,7 +55,7 @@ export const createIntent = async (req, resp) => {
             { customer  : customerId },
             {apiVersion : '2024-04-10'}
         );
-
+        const bookingDesc   = await sendDescBooking(booking_type, booking_id);
         const paymentIntent = await stripe.paymentIntents.create({
             amount                    : amount < 200 ? 200 : Math.floor(amount),
             currency                  : currency,
@@ -71,6 +71,7 @@ export const createIntent = async (req, resp) => {
                     request_three_d_secure : 'any',
                 },
             },
+            description: bookingDesc,
             metadata : {
                 booking_type : booking_type,
                 booking_id   : booking_id,
@@ -85,13 +86,6 @@ export const createIntent = async (req, resp) => {
             customer            : customerId,
             publishableKey      : process.env.STRIPE_PUBLISER_KEY,
         };
-        // if(coupon_code){
-        //     const coupon = await queryDB(`SELECT coupan_percentage FROM coupon WHERE coupan_code = ? LIMIT 1 `, [ coupon_code ]); 
-    
-        //     let coupan_percentage = coupon.coupan_percentage ;
-        //     await insertRecord('coupon_usage', ['coupan_code', 'user_id', 'booking_id', 'coupan_percentage'], [coupon_code, rider_id, booking_id, coupan_percentage]);
-        // }
-
         // await updateBoking( booking_type, booking_id, rider_id, paymentIntent.id ); 
         return resp.json({
             message : ["Payment Intent Created successfully!"],
@@ -582,17 +576,18 @@ export const getPaymentSession = async (req, resp) => {
                     country     : "United Arab Emirates",
                 },
                 email       : rider_email,
-                description : `This booking Id : ${booking_id} for POD Booking.`
+                // description : `This booking Id : ${booking_id} for POD Booking.`
             });
             customerId = customer.id;
         }
+        const bookingDesc = await sendDescBooking(booking_type, booking_id);
         const session = await stripe.checkout.sessions.create({
             payment_method_types : ["card"],
             line_items : [
                 {
                     price_data : {
                         currency     : currency,
-                        product_data : { name : `This booking Id : ${booking_id} for POD Booking.` },
+                        product_data : { name : bookingDesc },
                         unit_amount  : amount < 200 ? 200 : Math.floor(amount), // $50.00
                     },
                     quantity : 1,
@@ -606,6 +601,13 @@ export const getPaymentSession = async (req, resp) => {
             customer            : customerId, // Existing customer ID
             payment_intent_data : {
                 setup_future_usage : "on_session", // Forces 3D Secure authentication   off_session
+                metadata : {
+                    booking_type : booking_type,
+                    booking_id   : booking_id,
+                    user_id      : rider_id,
+                    coupon_code  : coupon_code,
+                },
+                description: bookingDesc,
             },
             saved_payment_method_options : {
                 payment_method_save :  "enabled"
@@ -619,14 +621,8 @@ export const getPaymentSession = async (req, resp) => {
                 booking_id   : booking_id,
                 user_id      : rider_id,
                 coupon_code  : coupon_code,
-            },
+            }
         });
-        // if(coupon_code) { 
-        //     const coupon = await queryDB(`SELECT coupan_percentage FROM coupon WHERE coupan_code = ? LIMIT 1 `, [ coupon_code ]); 
-    
-        //     let coupan_percentage = coupon.coupan_percentage ;
-        //     await insertRecord('coupon_usage', ['coupan_code', 'user_id', 'booking_id', 'coupan_percentage'], [coupon_code, rider_id, booking_id, coupan_percentage]);
-        // }
         // await updateBoking( booking_type, booking_id, rider_id, session.id ); 
         return resp.json({ 
             message    : ['Paymnet session'], 
@@ -713,6 +709,24 @@ const updateBoking = async (booking_type, booking_id, rider_id, payment_intent_i
         case 'RSA':
             await updateRecord('road_assistance', {payment_intent_id}, ['request_id', 'rider_id'], whereArr );
             break;
+        default:
+            console.log('Unknown booking type');
+            break;
+    }
+    return true;
+};
+const sendDescBooking = async (booking_type, booking_id,  ) => {
+    
+    switch (booking_type) {
+        case 'PCB':
+            return `POD Booking - ${booking_id}`;
+
+        case 'CS':
+            return `Pickup & Dropoff Booking - ${booking_id}`;
+
+        case 'RSA':
+            return `Roadside Assistance Service - ${booking_id}`;
+
         default:
             console.log('Unknown booking type');
             break;

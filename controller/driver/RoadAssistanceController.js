@@ -148,6 +148,8 @@ const acceptBooking = async (req, resp) => {
         const title   = 'RSA Booking Accepted';
         const message = `Booking Accepted! ID: ${booking_id}.`;
         await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
+
+        await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         await db.execute('UPDATE order_assign SET status = 1 WHERE order_id =? AND rsa_id =?', [booking_id, rsa_id]);
@@ -196,6 +198,7 @@ const driverEnroute = async (req, resp) => {
         const title   = 'PlusX Electric team is on the way!';
         const message = `Please have your EV ready for charging.`;
         await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
+        await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         return resp.json({ message : ['Booking Status changed successfully!'], status: 1, code: 200 });
@@ -235,6 +238,7 @@ const reachedLocation = async (req, resp) => {
         const title   = 'POD Reached at Location';
         const message = `The POD has arrived. Please unlock your EV.`;
         await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
+        await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         return resp.json({ message: ['POD Reached at Location Successfully!'], status: 1, code: 200 });
@@ -285,6 +289,7 @@ const chargingStart = async (req, resp) => {
         const title   = 'EV Charging Start';
         const message = `POD has started charging your EV!`;
         await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
+        await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         return resp.json({ message: ['Vehicle Charging Start successfully!'], status: 1, code: 200 });
@@ -331,7 +336,10 @@ const chargingComplete = async (req, resp) => {
         const title   = 'Charging Completed!';
         const message = `Charging complete, please lock your EV.`;
         await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
+        await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
+
+        await rsaInvoice(checkOrder.rider_id, booking_id); 
 
         return resp.json({ message: ['Vehicle Charging Completed successfully!'], status: 1, code: 200 });
     } else {
@@ -424,7 +432,6 @@ const chargerPickedUp = async (req, resp) => {
             // };
             emailQueue.addEmail(bookingData.data.rider_email, 'PlusX Electric: Your EV Roadside Assistance Service is Now Complete', html);  //, attachment
         // }
-        await rsaInvoice(checkOrder.rider_id, booking_id); 
         
         return resp.json({ message: ['Charger picked-up successfully!'], status: 1, code: 200 });
     } else {
