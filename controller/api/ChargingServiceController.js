@@ -355,8 +355,8 @@ export const cancelValetBooking = asyncHandler(async (req, resp) => {
     await updateRecord('charging_service', {order_status: 'C'}, ['request_id'], [booking_id]);
     
     const href    = `charging_service/${booking_id}`;
-    const title   = 'EV Pick Up & Drop Off Cancel!';
-    const message = `EV Pick Up & Drop Off Charging : Booking ID ${booking_id} - ${checkOrder.rider_name} cancelled the booking.`;
+    const title   = 'EV Pick Up & Drop Off Booking!';
+    const message = `Booking Cancelled! (${booking_id})`;
     await createNotification(title, message, 'Charging Service', 'Admin', 'Rider', rider_id, '', href);
 
     if( checkOrder.rsa_id) {
@@ -550,8 +550,8 @@ export const rescheduleService = asyncHandler(async (req, resp) => {
         if (insert.affectedRows == 0) return resp.json({ status: 0, code: 200, message: ["Oops! Something went wrong. Please try again."] });
         
         const href    = 'charging_service/' + booking_id;
-        const heading = 'EV Pick Up & Drop Off Rescheduled!';
-        const desc    = `Rescheduled Booking Confirmed! ID: ${booking_id}.`;
+        const heading = 'EV Pick Up & Drop Off Booking!';
+        const desc    = `Rescheduled Booking Confirmed! (${booking_id})`;
         createNotification(heading, desc, 'Charging Service', 'Rider', 'Admin', '', rider_id, href);
         createNotification(heading, desc, 'Charging Service', 'Admin', 'Rider', rider_id, '', href);
         pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);

@@ -145,8 +145,8 @@ const acceptBooking = async (req, resp) => {
         await updateRecord('road_assistance', { order_status: 'A', rsa_id}, ['request_id'], [booking_id]);
 
         const href    = `road_assistance/${booking_id}`;
-        const title   = 'RSA Booking Accepted';
-        const message = `Booking Accepted! ID: ${booking_id}.`;
+        const title   = 'EV Roadside Assistance';
+        const message = `Booking Accepted! ID: ${booking_id}`;
         await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
 
         await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
@@ -195,8 +195,8 @@ const driverEnroute = async (req, resp) => {
         await updateRecord('road_assistance', { order_status: 'ER'}, ['request_id' ], [booking_id ]);
 
         const href    = `road_assistance/${booking_id}`;
-        const title   = 'PlusX Electric team is on the way!';
-        const message = `Please have your EV ready for charging.`;
+        const title   = 'EV Roadside Assistance';
+        const message = `Rescue team is on the way!`;
         await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
         await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
@@ -235,8 +235,8 @@ const reachedLocation = async (req, resp) => {
         await updateRecord('road_assistance', { order_status: 'RL', rsa_id}, ['request_id'], [booking_id] );
 
         const href    = `road_assistance/${booking_id}`;
-        const title   = 'POD Reached at Location';
-        const message = `The POD has arrived. Please unlock your EV.`;
+        const title   = 'EV Roadside Assistance';
+        const message = `Rescue team has reached the location`;
         await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
         await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
@@ -286,8 +286,8 @@ const chargingStart = async (req, resp) => {
         await updateRecord('pod_devices', { charging_status : 1, latitude, longitude}, ['pod_id'], [pod_id] );
 
         const href    = `road_assistance/${booking_id}`;
-        const title   = 'EV Charging Start';
-        const message = `POD has started charging your EV!`;
+        const title   = 'EV Roadside Assistance';
+        const message = `Charging in progress`;
         await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
         await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
@@ -333,8 +333,8 @@ const chargingComplete = async (req, resp) => {
         await updateRecord('pod_devices', { charging_status : 0 }, ['pod_id'], [checkOrder.pod_id] );
 
         const href    = `road_assistance/${booking_id}`;
-        const title   = 'Charging Completed!';
-        const message = `Charging complete, please lock your EV.`;
+        const title   = 'EV Roadside Assistance';
+        const message = `Charging Completed`;
         await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
         await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);

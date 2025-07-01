@@ -718,11 +718,12 @@ export const assignBooking = async (req, resp) => {
         const href    = 'portable_charger_booking/' + booking_id;
         const heading = 'Booking Assigned!';
         const desc    = `Your POD Booking has been assigned to Driver by PlusX admin with booking id : ${booking_id}`;
-        createNotification(heading, desc, 'Portable Charging Booking', 'Rider', 'Admin', '', booking_data.rider_id, href);
-        pushNotification(booking_data.fcm_token, heading, desc, 'RDRFCM', href);
+        // createNotification(heading, desc, 'Portable Charging Booking', 'Rider', 'Admin', '', booking_data.rider_id, href);
+    //    
+        // pushNotification(booking_data.fcm_token, heading, desc, 'RDRFCM', href);
 
-        const heading1 = 'Portable Charger Booking';
-        const desc1    = `A Booking of the portable charging booking has been assigned to you with booking id :  ${booking_id}`;
+        const heading1 = 'Portable Charging Booking!';
+        const desc1    = `Booking Assigned: (${booking_id})`;
         createNotification(heading, desc1, 'Portable Charger', 'RSA', 'Rider', booking_data.rider_id, rsa_id, href);
         pushNotification(rsa.fcm_token, heading1, desc1, 'RSAFCM', href);
 

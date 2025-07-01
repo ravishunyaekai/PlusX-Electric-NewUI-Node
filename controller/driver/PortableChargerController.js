@@ -182,10 +182,10 @@ const acceptBooking = async (req, resp) => {
         await updateRecord('portable_charger_booking', {status: 'A', rsa_id}, ['booking_id'], [booking_id]);
 
         const href    = `portable_charger_booking/${booking_id}`;
-        const title   = 'POD Booking Accepted';
-        const message = `Booking Accepted! ID: ${booking_id}.`;
+        const title   = 'Portable Charging Booking!';
+        const message = `Booking Accepted! (${booking_id})`;
         await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
-        await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
+      //  await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         await db.execute('UPDATE portable_charger_booking_assign SET status = 1 WHERE order_id = ? AND rsa_id = ?', [booking_id, rsa_id]);
@@ -233,10 +233,10 @@ const driverEnroute = async (req, resp) => {
         await updateRecord('portable_charger_booking', {status: 'ER'}, ['booking_id' ], [booking_id ]);
 
         const href    = `portable_charger_booking/${booking_id}`;
-        const title   = 'PlusX Electric team is on the way!';
-        const message = `Please have your EV ready for charging.`;
+        const title   = 'Portable Charging Booking!';
+        const message = `PlusX Electric team is on the way!`;
         await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
-        await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
+        //await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         return resp.json({ message : ['PlusX Electric team is on the way!  Please have your EV ready for charging.'], status: 1, code: 200 });
@@ -273,10 +273,10 @@ const reachedLocation = async (req, resp) => {
         await updateRecord('portable_charger_booking', {status: 'RL', rsa_id}, ['booking_id'], [booking_id] );
 
         const href    = `portable_charger_booking/${booking_id}`;
-        const title   = 'POD Reached at Location';
+        const title   = 'Portable Charging Booking!';
         const message = `The POD has arrived. Please unlock your EV.`;
         await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
-        await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
+        // await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         return resp.json({ message: ['The Portable Power Pod has arrived. Please unlock your EV.'], status: 1, code: 200 });
@@ -323,10 +323,10 @@ const chargingStart = async (req, resp) => {
         await updateRecord('pod_devices', { charging_status : 1, latitude, longitude}, ['pod_id'], [pod_id] );
 
         const href    = `portable_charger_booking/${booking_id}`;
-        const title   = 'EV Charging Start';
-        const message = `POD has started charging your EV!`;
+        const title   = 'Portable Charging Booking!';
+        const message = `The POD has started charging your EV!`;
         await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
-        await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
+        // await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         return resp.json({ message: ['Charging has started. The Pod is now powering your EV!'], status: 1, code: 200 });
@@ -370,10 +370,11 @@ const chargingComplete = async (req, resp) => {
         await updateRecord('pod_devices', { charging_status : 0 }, ['pod_id'], [checkOrder.pod_id] );
 
         const href    = `portable_charger_booking/${booking_id}`;
-        const title   = 'Charging Completed!';
-        const message = `Charging complete, please lock your EV.`;
+        const title   = 'Portable Charging Booking!';
+        const message = `Charging complete. Please lock your EV.`;
+
         await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
-        await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
+        // await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
        
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 

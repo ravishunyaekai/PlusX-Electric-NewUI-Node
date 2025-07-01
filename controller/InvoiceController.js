@@ -69,7 +69,7 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
  
             const href    = 'charging_service/' + request_id;
             const heading = 'EV Pick Up & Drop Off Booking!';
-            const desc    = `Booking Confirmed! ID: ${request_id}.`;
+            const desc    = `Booking Confirmed! (${request_id})`;
             createNotification(heading, desc, 'Charging Service', 'Rider', 'Admin','', rider_id, href);
             createNotification(heading, desc, 'Charging Service', 'Admin', 'Rider', rider_id, '', href);
             pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
@@ -175,7 +175,7 @@ export const portableChargerInvoice = asyncHandler(async (req, resp) => {
 
             const href    = 'portable_charger_booking/' + request_id;
             const heading = 'Portable Charging Booking!';
-            const desc    = `Booking Confirmed! ID: ${request_id}.`;
+            const desc    = `Booking Confirmed! (${request_id})`;
             createNotification(heading, desc, 'Portable Charging Booking', 'Rider', 'Admin','', rider_id, href);
             createNotification(heading, desc, 'Portable Charging Booking', 'Admin', 'Rider',  rider_id, '', href);
             pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
@@ -279,9 +279,10 @@ export const rsaInvoice = asyncHandler(async (req, resp) => {
             await updateRecord('road_assistance', { order_status : 'CNF', payment_intent_id : paymentIntentId}, ['request_id', 'rider_id'], [request_id, rider_id] ); //, conn
 
             const href    = 'road_assistance/' + request_id;
-            const heading = 'EV Roadside Assistance Booking!';
-            const desc    = `Booking Confirmed! : ( ${request_id} )`;
+            const heading = 'EV Roadside Assistance';
+            const desc    = `Booking Confirmed! ID: ( ${request_id} )`;
             createNotification(heading, desc, 'Roadside Assistance', 'Rider', 'Admin','', rider_id, href);
+            
             createNotification(heading, desc, 'Roadside Assistance', 'Admin', 'Rider', rider_id, '', href);
             pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
         
