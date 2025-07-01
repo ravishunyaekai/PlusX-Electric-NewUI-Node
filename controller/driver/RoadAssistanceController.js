@@ -146,10 +146,10 @@ const acceptBooking = async (req, resp) => {
 
         const href    = `road_assistance/${booking_id}`;
         const title   = 'EV Roadside Assistance';
-        const message = `Booking Accepted! ID: ${booking_id}`;
+        const message = `Booking Accepted! ID: (${booking_id})`;
         await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
 
-        await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
+        // await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         await db.execute('UPDATE order_assign SET status = 1 WHERE order_id =? AND rsa_id =?', [booking_id, rsa_id]);
@@ -198,7 +198,7 @@ const driverEnroute = async (req, resp) => {
         const title   = 'EV Roadside Assistance';
         const message = `Rescue team is on the way!`;
         await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
-        await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
+        // await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         return resp.json({ message : ['Booking Status changed successfully!'], status: 1, code: 200 });
@@ -238,7 +238,7 @@ const reachedLocation = async (req, resp) => {
         const title   = 'EV Roadside Assistance';
         const message = `Rescue team has reached the location`;
         await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
-        await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
+        // await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         return resp.json({ message: ['POD Reached at Location Successfully!'], status: 1, code: 200 });
@@ -289,7 +289,7 @@ const chargingStart = async (req, resp) => {
         const title   = 'EV Roadside Assistance';
         const message = `Charging in progress`;
         await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
-        await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
+        // await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         return resp.json({ message: ['Vehicle Charging Start successfully!'], status: 1, code: 200 });
@@ -336,7 +336,7 @@ const chargingComplete = async (req, resp) => {
         const title   = 'EV Roadside Assistance';
         const message = `Charging Completed`;
         await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
-        await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
+        // await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         await rsaInvoice(checkOrder.rider_id, booking_id); 

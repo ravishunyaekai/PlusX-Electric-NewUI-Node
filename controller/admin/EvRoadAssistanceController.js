@@ -304,12 +304,12 @@ export const rsaAssignBooking = async (req, resp) => {
         await updateRecord('road_assistance', {rsa_id: rsa_id}, ['request_id'], [booking_id]);
        
         const href    = 'road_assistance/' + booking_id;
-        const heading = 'EV Roadside Assistance Booking Assigned!';
-        const desc    = `Your EV Roadside Assistance Booking has been assigned to Driver by PlusX admin with booking id : ${booking_id}`;
+        const heading = 'EV Roadside Assistance';
+        const desc    = `Booking Assigned: (${booking_id})`;
         //createNotification(heading, desc, 'Roadside Assistance', 'Rider', 'Admin', '', booking_data.rider_id, href);
             //pushNotification(booking_data.fcm_token, heading, desc, 'RDRFCM', href);
 
-        const desc1 = `A Booking of the EV Roadside Assistance booking has been assigned to you with booking id :  ${booking_id}`;
+        const desc1 = `Booking Assigned: (${booking_id})`;
         createNotification(heading, desc1, 'Roadside Assistance', 'RSA', 'Admin', '', rsa_id, href);
         if(rsa.fcm_token) {
             pushNotification(rsa.fcm_token, heading, desc1, 'RSAFCM', href);
