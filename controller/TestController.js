@@ -174,8 +174,8 @@ const portableChargerBookingConfirm = async (booking_id, payment_intent_id, coup
             await updateRecord('portable_charger_booking', { status : 'CNF', payment_intent_id}, ['booking_id', 'rider_id'], [booking_id, checkOrder.rider_id] );
 
             const href    = 'portable_charger_booking/' + booking_id;
-            const heading = 'Portable Charging Booking!';
-            const desc    = `Booking Confirmed! ID: ${booking_id}.`;
+              const heading = 'Portable Charging Booking!';
+            const desc    = `Booking Confirmed! (${request_id})`;
             createNotification(heading, desc, 'Portable Charging Booking', 'Rider', 'Admin','', checkOrder.rider_id, href);
             createNotification(heading, desc, 'Portable Charging Booking', 'Admin', 'Rider',  checkOrder.rider_id, '', href);
             pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
@@ -262,8 +262,10 @@ const pickAndDropBookingConfirm = async (request_id, payment_intent_id, couponCo
             await updateRecord('charging_service', { order_status : 'CNF', payment_intent_id }, ['request_id', 'rider_id'], [request_id, checkOrder.rider_id] );
 
             const href    = 'charging_service/' + request_id;
-            const heading = 'EV Pick Up & Drop-Off Booking!';
-            const desc    = `Booking Confirmed! ID: ${request_id}.`;
+            // const heading = 'EV Pick Up & Drop-Off Booking!';
+            // const desc    = `Booking Confirmed! ID: ${request_id}.`;
+            const heading = 'EV Pick Up & Drop Off Booking!';
+            const desc    = `Booking Confirmed! (${request_id})`;
             createNotification(heading, desc, 'Charging Service', 'Rider', 'Admin','', checkOrder.rider_id, href);
             createNotification(heading, desc, 'Charging Service', 'Admin', 'Rider', checkOrder.rider_id, '', href);
             pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
@@ -353,8 +355,10 @@ const rsaBookingConfirm = async (request_id, payment_intent_id, couponCode) => {
             await updateRecord('road_assistance', { order_status : 'CNF', payment_intent_id}, ['request_id', 'rider_id'], [request_id, checkOrder.rider_id] );
 
             const href    = 'road_assistance/' + request_id;
-            const heading = 'Roadside Assistance Created';
-            const desc    = `Booking Confirmed! : ( ${request_id} )`;
+            // const heading = 'Roadside Assistance Created';
+            // const desc    = `Booking Confirmed! : ( ${request_id} )`;
+             const heading = 'EV Roadside Assistance';
+            const desc    = `Booking Confirmed! ID: (${request_id})`;
             createNotification(heading, desc, 'Roadside Assistance', 'Rider', 'Admin','', checkOrder.rider_id, href);
             pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
         

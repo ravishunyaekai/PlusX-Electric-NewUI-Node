@@ -280,7 +280,7 @@ export const rsaInvoice = asyncHandler(async (req, resp) => {
 
             const href    = 'road_assistance/' + request_id;
             const heading = 'EV Roadside Assistance';
-            const desc    = `Booking Confirmed! ID: ( ${request_id} )`;
+            const desc    = `Booking Confirmed! ID: (${request_id})`;
             createNotification(heading, desc, 'Roadside Assistance', 'Rider', 'Admin','', rider_id, href);
             
             createNotification(heading, desc, 'Roadside Assistance', 'Admin', 'Rider', rider_id, '', href);

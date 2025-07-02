@@ -146,7 +146,7 @@ const acceptBooking = async (req, resp) => {
 
         const href    = `road_assistance/${booking_id}`;
         const title   = 'EV Roadside Assistance';
-        const message = `Booking Accepted! ID: (${booking_id})`;
+        const message = `Booking Accepted! ID: ${booking_id}`;
         await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
 
         // await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
