@@ -17,44 +17,78 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
+export const getActivePodList = asyncHandler(async (req, resp) => {
+    const { booking_id, booking_type } = mergeParam(req);
+    const { isValid, errors } = validateFields(mergeParam(req), { booking_id: ["required"], booking_type: ["required"]});
+    if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
+    if (!['PCB', 'CS', 'RSA'].includes(booking_type)) return resp.json({status:0, code:422, message:"Booking type should be PCB, RSA or CS"});
+
+    let query;
+    let active_pod_id;
+    if(booking_type === 'PCB'){
+        query = `SELECT latitude AS lat, longitude AS lon FROM portable_charger_booking WHERE booking_id = ?`;
+        const [[{pod_id}]] = await db.execute(`SELECT pod_id FROM portable_charger_booking where booking_id = ?`, [booking_id]);
+        active_pod_id = pod_id;
+
+    } else if(booking_type === 'CS') { 
+        query = `SELECT pickup_latitude AS lat, pickup_longitude AS lon FROM charging_service WHERE request_id = ?`;
+
+    } else if(booking_type === 'RSA') {
+        query = `SELECT pickup_latitude AS lat, pickup_longitude AS lon FROM road_assistance WHERE request_id = ?`;
+        const [[{pod_id}]] = await db.execute(`SELECT pod_id FROM road_assistance where request_id = ?`, [booking_id]);
+        active_pod_id = pod_id;
+    }
+    const data = await queryDB(query, [booking_id]);
+    if(!data) return resp.json({ status : 0, code :422, message : ["Invalid booking id."]});
+    
+    const [result] = await db.execute(`SELECT 
+        pod_id, pod_name, design_model,
+        (6367 * ACOS(COS(RADIANS(?)) * COS(RADIANS(latitude)) * COS(RADIANS(longitude) - RADIANS(?)) + SIN(RADIANS(?)) * SIN(RADIANS(latitude)))) AS distance 
+        FROM pod_devices
+        ORDER BY CAST(SUBSTRING(pod_name, LOCATE(' ', pod_name) + 1) AS UNSIGNED)
+    `, [data.lat, data.lon, data.lat]);
+
+    return resp.json({ status:1, code:200, message:["POD List fetch successfully!"], active_pod_id, data: result });
+    // return resp.json({status:1, code:200, message:["POD List fetch successfully!"], data: result });
+});
 
 /* RSA - Booking Action */
-export const getRsaOrderStage = asyncHandler(async (req, resp) => {
+export const rsaBookingStage = asyncHandler(async (req, resp) => {
     const {rsa_id, booking_id } = mergeParam(req);
     const { isValid, errors }   = validateFields(mergeParam(req), {rsa_id: ["required"], booking_id: ["required"]});
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
 
-    const booking = await queryDB(`SELECT order_status, created_at, updated_at FROM road_assistance WHERE request_id = ?`, [booking_id]);
-    if(!booking) return resp.json({status:0, code:200, message: ["Sorry no data found with given order id: " + booking_id]});
+    const booking = await queryDB(`SELECT status, created_at, updated_at FROM portable_charger_booking WHERE booking_id=?`, [booking_id]);
+    if(!booking) return resp.json({status:0, code:200, message: "Sorry no data found with given order id: " + booking_id});
 
     const orderStatus  = ['A', 'ER', 'RL', 'CS', 'CC', 'PU', 'C'];
     const placeholders = orderStatus.map(() => '?').join(', ');
 
-    const [bookingTracking] = await db.execute(`SELECT order_status, remarks, image, cancel_reason, cancel_by, longitude, latitude FROM order_history 
-        WHERE order_id = ? AND rsa_id = ? AND order_status IN (${placeholders})
+    const [bookingTracking] = await db.execute(`SELECT order_status, remarks, image, cancel_reason, cancel_by, longitude, latitude FROM portable_charger_history 
+        WHERE booking_id = ? AND rsa_id = ? AND order_status IN (${placeholders})
     `, [booking_id, rsa_id, ...orderStatus]);
 
     const seconds = Math.floor((booking.updated_at - booking.created_at) / 1000);
     const humanReadableDuration = moment.duration(seconds, 'seconds').format('h [hours], m [minutes]');
     
     return resp.json({
-        status          : 1,
-        code            : 200,
-        message         : ["Booking stage fetch successfully."],
-        booking_status  : booking.status,
-        execution_time  : humanReadableDuration,
-        booking_history : bookingTracking,
-        image_path      : `${process.env.DIR_UPLOADS}road-assistance/`
+        status: 1,
+        code: 200,
+        message: ["Booking stage fetch successfully."],
+        booking_status: booking.status,
+        execution_time: humanReadableDuration,
+        booking_history: bookingTracking,
+        image_path: `${req.protocol}://${req.get('host')}/uploads/portable-charger/`
     });
     
 });
 
-export const orderAction = asyncHandler(async (req, resp) => {  
+export const bookingAction = asyncHandler(async (req, resp) => {  
     const {rsa_id, booking_id, reason, latitude, longitude, booking_status, pod_id} = req.body;
     let validationRules = {
         rsa_id         : ["required"], 
         booking_id     : ["required"], 
-        latitude       : ["required"],
+        latitude       : ["required"], 
         longitude      : ["required"], 
         booking_status : ["required"],
     };
@@ -83,9 +117,9 @@ export const rejectBooking = asyncHandler(async (req, resp) => {
 
     const checkOrder = await queryDB(`
         SELECT rider_id, 
-            (SELECT fcm_token FROM riders WHERE rider_id = order_assign.rider_id limit 1) AS fcm_token
+            (SELECT fcm_token FROM riders WHERE rider_id = portable_charger_booking_assign.rider_id limit 1) AS fcm_token
         FROM 
-            order_assign
+            portable_charger_booking_assign
         WHERE 
             order_id = ? AND rsa_id = ? AND status = 0
         LIMIT 1
@@ -94,23 +128,25 @@ export const rejectBooking = asyncHandler(async (req, resp) => {
     if (!checkOrder) {
         return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 404 });
     }
+
     const insert = await db.execute(
-        'INSERT INTO order_history (order_id, rider_id, order_status, rsa_id) VALUES (?, ?, "C", ?)',
+        'INSERT INTO portable_charger_history (booking_id, rider_id, order_status, rsa_id) VALUES (?, ?, "C", ?)',
         [booking_id, checkOrder.rider_id, rsa_id ]
     );
     if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
 
-    await db.execute(`DELETE FROM order_assign WHERE order_id=? AND rsa_id=?`, [booking_id, rsa_id]);
+    await insertRecord('portable_charger_booking_rejected', ['booking_id', 'rsa_id', 'rider_id', 'reason'],[booking_id, rsa_id, checkOrder.rider_id, reason]);
+    await db.execute(`DELETE FROM portable_charger_booking_assign WHERE order_id=? AND rsa_id=?`, [booking_id, rsa_id]);
 
-    const href    = `road_assistance/${booking_id}`;
+    const href    = `portable_charger_booking/${booking_id}`;
     const title   = 'Booking Rejected';
-    const message = `Driver has rejected the Ev roadside assistance booking with booking id: ${booking_id}`;
-    await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
+    const message = `Driver has rejected the portable charger booking with booking id: ${booking_id}`;
+    await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
 
     const html = `<html>
         <body>
             <h4>Dear Admin,</h4>
-            <p>Driver has rejected the Ev Roadside Assistance booking. please assign one Driver on this booking</p> <br />
+            <p>Driver has rejected the portable charger booking. please assign one Driver on this booking</p> <br />
             <p>Booking ID: ${booking_id}</p>
             <p>Best Regards,<br/> The PlusX Electric Team </p>
         </body>
@@ -124,43 +160,45 @@ export const rejectBooking = asyncHandler(async (req, resp) => {
 const acceptBooking = async (req, resp) => {
     const { booking_id, rsa_id, latitude, longitude } = mergeParam(req);
 
+    //, (SELECT COUNT(id) FROM portable_charger_booking_assign WHERE rsa_id = ? AND status = 1) AS pod_count
     const checkOrder = await queryDB(`
         SELECT rider_id, 
-            (SELECT fcm_token FROM riders WHERE rider_id = order_assign.rider_id limit 1) AS fcm_token
+            (SELECT fcm_token FROM riders WHERE rider_id = portable_charger_booking_assign.rider_id limit 1) AS fcm_token
         FROM 
-            order_assign
+            portable_charger_booking_assign
         WHERE 
             order_id = ? AND rsa_id = ? AND status = 0
         LIMIT 1
     `,[booking_id, rsa_id]);
-    // console.log(checkOrder);
+
     if (!checkOrder) {
-        return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 422 });
+        return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 404 });
     }
     const ordHistoryCount = await queryDB(
-        'SELECT COUNT(*) as count FROM order_history WHERE rsa_id = ? AND order_status = "A" AND order_id = ?',[rsa_id, booking_id]
+        'SELECT COUNT(*) as count FROM portable_charger_history WHERE rsa_id = ? AND order_status = "A" AND booking_id = ?',[rsa_id, booking_id]
     );
 
     if (ordHistoryCount.count === 0) {
-        await updateRecord('road_assistance', { order_status: 'A', rsa_id}, ['request_id'], [booking_id]);
+        await updateRecord('portable_charger_booking', {status: 'A', rsa_id}, ['booking_id'], [booking_id]);
 
-        const href    = `road_assistance/${booking_id}`;
-        const title   = 'EV Roadside Assistance';
-        const message = `Booking Accepted! ID : ${booking_id}`;
-        await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
-
-        // await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
+        const href    = `portable_charger_booking/${booking_id}`;
+        const title   = 'POD Booking Accepted';
+        const message = `Booking Accepted! ID: ${booking_id}.`;
+        await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
+        await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
-        await db.execute('UPDATE order_assign SET status = 1 WHERE order_id =? AND rsa_id =?', [booking_id, rsa_id]);
-        const insert = await insertRecord('order_history', [
-            'order_id', 'rider_id', 'order_status', 'rsa_id', 'latitude', 'longitude'
+        await db.execute('UPDATE portable_charger_booking_assign SET status = 1 WHERE order_id = ? AND rsa_id = ?', [booking_id, rsa_id]);
+        const insert = await insertRecord('portable_charger_history', [
+            'booking_id', 'rider_id', 'order_status', 'rsa_id', 'latitude', 'longitude'
         ],[
             booking_id, checkOrder.rider_id, "A", rsa_id, latitude, longitude
         ]);
-        if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 422 });
+        if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
 
-        return resp.json({ message: ['RSA Booking accepted successfully!'], status: 1, code: 200 });
+        // await db.execute('UPDATE rsa SET running_order = running_order + 1 WHERE rsa_id = ?', [rsa_id]);
+
+        return resp.json({ message: ['POD Booking accepted successfully!'], status: 1, code: 200 });
     } else {
         return resp.json({ message: ['Sorry this is a duplicate entry!'], status: 0, code: 200 });
     }
@@ -171,9 +209,9 @@ const driverEnroute = async (req, resp) => {
 
     const checkOrder = await queryDB(`
         SELECT rider_id, 
-            (SELECT fcm_token FROM riders WHERE rider_id = order_assign.rider_id limit 1) AS fcm_token
+            (SELECT fcm_token FROM riders WHERE rider_id = portable_charger_booking_assign.rider_id limit 1) AS fcm_token
         FROM 
-            order_assign
+            portable_charger_booking_assign
         WHERE 
             order_id = ? AND rsa_id = ? AND status = 1
         LIMIT 1
@@ -183,22 +221,22 @@ const driverEnroute = async (req, resp) => {
         return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 404 });
     }
     const ordHistoryCount = await queryDB(
-        'SELECT COUNT(*) as count FROM order_history WHERE rsa_id = ? AND order_status = "ER" AND order_id = ?', [rsa_id, booking_id]
+        'SELECT COUNT(*) as count FROM portable_charger_history WHERE rsa_id = ? AND order_status = "ER" AND booking_id = ?', [rsa_id, booking_id]
     );
     if (ordHistoryCount.count === 0) {
         const insert = await db.execute(
-            'INSERT INTO order_history (order_id, rider_id, order_status, rsa_id, latitude, longitude) VALUES (?, ?, "ER", ?, ?, ?)',
+            'INSERT INTO portable_charger_history (booking_id, rider_id, order_status, rsa_id, latitude, longitude) VALUES (?, ?, "ER", ?, ?, ?)',
             [booking_id, checkOrder.rider_id, rsa_id, latitude, longitude]
         );
         if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
 
-        await updateRecord('road_assistance', { order_status: 'ER'}, ['request_id' ], [booking_id ]);
+        await updateRecord('portable_charger_booking', {status: 'ER'}, ['booking_id' ], [booking_id ]);
 
-        const href    = `road_assistance/${booking_id}`;
-        const title   = 'EV Roadside Assistance';
-        const message = `Rescue team is on the way!`;
-        await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
-        // await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
+        const href    = `portable_charger_booking/${booking_id}`;
+        const title   = 'PlusX Electric team is on the way!';
+        const message = `Please have your EV ready for charging.`;
+         await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
+        // await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         return resp.json({ message : ['Booking Status changed successfully!'], status: 1, code: 200 });
@@ -211,9 +249,9 @@ const reachedLocation = async (req, resp) => {
 
     const checkOrder = await queryDB(`
         SELECT rider_id, 
-            (SELECT fcm_token FROM riders WHERE rider_id = order_assign.rider_id limit 1) AS fcm_token
+            (SELECT fcm_token FROM riders WHERE rider_id = portable_charger_booking_assign.rider_id limit 1) AS fcm_token
         FROM 
-            order_assign
+            portable_charger_booking_assign
         WHERE 
             order_id = ? AND rsa_id = ? AND status = 1
         LIMIT 1
@@ -223,22 +261,22 @@ const reachedLocation = async (req, resp) => {
         return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 404 });
     }
     const ordHistoryCount = await queryDB(
-        'SELECT COUNT(*) as count FROM order_history WHERE rsa_id = ? AND order_status = "RL" AND order_id = ?',[rsa_id, booking_id]
+        'SELECT COUNT(*) as count FROM portable_charger_history WHERE rsa_id = ? AND order_status = "RL" AND booking_id = ?',[rsa_id, booking_id]
     );
     if (ordHistoryCount.count === 0) {
         const insert = await db.execute(
-            'INSERT INTO order_history (order_id, rider_id, order_status, rsa_id, latitude, longitude) VALUES (?, ?, "RL", ?, ?, ?)',
+            'INSERT INTO portable_charger_history (booking_id, rider_id, order_status, rsa_id, latitude, longitude) VALUES (?, ?, "RL", ?, ?, ?)',
             [booking_id, checkOrder.rider_id, rsa_id, latitude, longitude]
         );
         if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
 
-        await updateRecord('road_assistance', { order_status: 'RL', rsa_id}, ['request_id'], [booking_id] );
+        await updateRecord('portable_charger_booking', {status: 'RL', rsa_id}, ['booking_id'], [booking_id] );
 
-        const href    = `road_assistance/${booking_id}`;
-        const title   = 'EV Roadside Assistance';
-        const message = `Rescue team has reached the location`;
-        await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
-        // await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
+        const href    = `portable_charger_booking/${booking_id}`;
+        const title   = 'POD Reached at Location';
+        const message = `The POD has arrived. Please unlock your EV.`;
+        await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
+        await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         return resp.json({ message: ['POD Reached at Location Successfully!'], status: 1, code: 200 });
@@ -247,15 +285,15 @@ const reachedLocation = async (req, resp) => {
     }
 };
 const chargingStart = async (req, resp) => {
-    const { booking_id, rsa_id, latitude, longitude, pod_id = '', remark='' } = mergeParam(req);
+    const { booking_id, rsa_id, latitude, longitude, pod_id='', guideline='', remark='' } = mergeParam(req);
 
     if (!req.files || !req.files['image']) return resp.status(405).json({ message: ["Vehicle Image is required"], status: 0, code: 405, error: true });
 
     const checkOrder = await queryDB(`
         SELECT rider_id, 
-            (SELECT fcm_token FROM riders WHERE rider_id = order_assign.rider_id limit 1) AS fcm_token
+            (SELECT fcm_token FROM riders WHERE rider_id = portable_charger_booking_assign.rider_id limit 1) AS fcm_token
         FROM 
-            order_assign
+            portable_charger_booking_assign
         WHERE 
             order_id = ? AND rsa_id = ? AND status = 1
         LIMIT 1
@@ -267,29 +305,28 @@ const chargingStart = async (req, resp) => {
         return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 404 });
     }
     const ordHistoryCount = await queryDB(
-        'SELECT COUNT(*) as count FROM order_history WHERE rsa_id = ? AND order_status = "CS" AND order_id = ?',[rsa_id, booking_id]
+        'SELECT COUNT(*) as count FROM portable_charger_history WHERE rsa_id = ? AND order_status = "CS" AND booking_id = ?',[rsa_id, booking_id]
     );
-    
     if (ordHistoryCount.count === 0) {
-        
         const podBatteryData = await getPodBatteryData(pod_id);
         const podData        = podBatteryData.data.length > 0 ? JSON.stringify(podBatteryData.data) : null;
         const sumOfLevel     = podBatteryData.sum ?  podBatteryData.sum : '';
         
         const insert = await db.execute(
-            'INSERT INTO order_history (order_id, rider_id, order_status, rsa_id, latitude, longitude, pod_data, image, remarks) VALUES (?, ?, "CS", ?, ?, ?, ?, ?, ?)',
-            [booking_id, checkOrder.rider_id, rsa_id, latitude, longitude, podData, images, remark]
+            'INSERT INTO portable_charger_history (booking_id, rider_id, order_status, rsa_id, latitude, longitude, pod_data, image, guideline, remarks) VALUES (?, ?, "CS", ?, ?, ?, ?, ?, ?, ?)',
+            [booking_id, checkOrder.rider_id, rsa_id, latitude, longitude, podData, images, guideline, remark]
         );
         if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
 
-        await updateRecord('road_assistance', {order_status: 'CS', rsa_id, pod_id, start_charging_level: sumOfLevel }, ['request_id'], [booking_id] );
+        let addressAlert = ( parseInt(guideline) > 0 ) ? remark : '';
+        await updateRecord('portable_charger_booking', {status: 'CS', rsa_id, pod_id, start_charging_level: sumOfLevel, address_alert : addressAlert }, ['booking_id'], [booking_id] );
         await updateRecord('pod_devices', { charging_status : 1, latitude, longitude}, ['pod_id'], [pod_id] );
 
-        const href    = `road_assistance/${booking_id}`;
-        const title   = 'EV Roadside Assistance';
-        const message = `Charging in progress`;
-        await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
-        // await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
+        const href    = `portable_charger_booking/${booking_id}`;
+        const title   = 'EV Charging Start';
+        const message = `POD has started charging your EV!`;
+        await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
+        await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         return resp.json({ message: ['Vehicle Charging Start successfully!'], status: 1, code: 200 });
@@ -298,14 +335,14 @@ const chargingStart = async (req, resp) => {
     }
 };
 const chargingComplete = async (req, resp) => {
-    const { booking_id, rsa_id, latitude, longitude } = mergeParam(req);
+    const { booking_id, rsa_id, latitude, longitude, pod_id } = mergeParam(req);
     // 
     const checkOrder = await queryDB(`
         SELECT rider_id, 
-            (SELECT fcm_token FROM riders WHERE rider_id = order_assign.rider_id limit 1) AS fcm_token,
-            (SELECT pod_id FROM road_assistance as rsa WHERE rsa.request_id = order_assign.order_id limit 1) AS pod_id
+            (SELECT fcm_token FROM riders WHERE rider_id = portable_charger_booking_assign.rider_id limit 1) AS fcm_token,
+            (SELECT pod_id FROM portable_charger_booking as pcb WHERE pcb.booking_id = portable_charger_booking_assign.order_id limit 1) AS pod_id
         FROM 
-            order_assign
+            portable_charger_booking_assign
         WHERE 
             order_id = ? AND rsa_id = ? AND status = 1
         LIMIT 1
@@ -315,7 +352,7 @@ const chargingComplete = async (req, resp) => {
         return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 404 });
     }
     const ordHistoryCount = await queryDB(
-        'SELECT COUNT(*) as count FROM order_history WHERE rsa_id = ? AND order_status = "CC" AND order_id = ?',[rsa_id, booking_id]
+        'SELECT COUNT(*) as count FROM portable_charger_history WHERE rsa_id = ? AND order_status = "CC" AND booking_id = ?',[rsa_id, booking_id]
     );
     if (ordHistoryCount.count === 0) {
 
@@ -324,22 +361,20 @@ const chargingComplete = async (req, resp) => {
         const sumOfLevel     = podBatteryData.sum ? podBatteryData.sum : 0;
 
         const insert = await db.execute(
-            'INSERT INTO order_history (order_id, rider_id, order_status, rsa_id, latitude, longitude, pod_data) VALUES (?, ?, "CC", ?, ?, ?, ?)',
+            'INSERT INTO portable_charger_history (booking_id, rider_id, order_status, rsa_id, latitude, longitude, pod_data) VALUES (?, ?, "CC", ?, ?, ?, ?)',
             [booking_id, checkOrder.rider_id, rsa_id, latitude, longitude, podData]
         );
         if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
 
-        await updateRecord('road_assistance', {order_status: 'CC', rsa_id, end_charging_level:sumOfLevel }, ['request_id'], [booking_id] );
+        await updateRecord('portable_charger_booking', {status: 'CC', rsa_id, end_charging_level:sumOfLevel }, ['booking_id'], [booking_id] );
         await updateRecord('pod_devices', { charging_status : 0 }, ['pod_id'], [checkOrder.pod_id] );
 
-        const href    = `road_assistance/${booking_id}`;
-        const title   = 'EV Roadside Assistance';
-        const message = `Charging Completed`;
-        await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
-        // await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
+        const href    = `portable_charger_booking/${booking_id}`;
+        const title   = 'Charging Completed!';
+        const message = `Charging complete, please lock your EV.`;
+        await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
+        await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
-
-        await rsaInvoice(checkOrder.rider_id, booking_id); 
 
         return resp.json({ message: ['Vehicle Charging Completed successfully!'], status: 1, code: 200 });
     } else {
@@ -352,10 +387,10 @@ const chargerPickedUp = async (req, resp) => {
     
     const checkOrder = await queryDB(`
         SELECT rider_id, 
-            (SELECT fcm_token FROM riders WHERE rider_id = order_assign.rider_id limit 1) AS fcm_token,
-            (SELECT pod_id FROM road_assistance as rsa WHERE rsa.request_id = order_assign.order_id limit 1) AS pod_id
+            (SELECT fcm_token FROM riders WHERE rider_id = portable_charger_booking_assign.rider_id limit 1) AS fcm_token,
+            (select pod_id from portable_charger_booking as pb where pb.booking_id = portable_charger_booking_assign.order_id limit 1) as pod_id
         FROM 
-            order_assign
+            portable_charger_booking_assign
         WHERE 
             order_id = ? AND rsa_id = ? AND status = 1
         LIMIT 1
@@ -367,21 +402,21 @@ const chargerPickedUp = async (req, resp) => {
         return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 404 });
     }
     const ordHistoryCount = await queryDB(
-        'SELECT COUNT(*) as count FROM order_history WHERE rsa_id = ? AND order_status = "PU" AND order_id = ?',[rsa_id, booking_id]
+        'SELECT COUNT(*) as count FROM portable_charger_history WHERE rsa_id = ? AND order_status = "PU" AND booking_id = ?',[rsa_id, booking_id]
     );
     if (ordHistoryCount.count === 0) {
         const insert = await db.execute(
-            'INSERT INTO order_history (order_id, rider_id, order_status, rsa_id, latitude, longitude, image, remarks) VALUES (?, ?, "PU", ?, ?, ?, ?, ?)',
+            'INSERT INTO portable_charger_history (booking_id, rider_id, order_status, rsa_id, latitude, longitude, image, remarks) VALUES (?, ?, "PU", ?, ?, ?, ?, ?)',
             [booking_id, checkOrder.rider_id, rsa_id, latitude, longitude, images, remark]
         );
         if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
 
-        await updateRecord('road_assistance', {order_status: 'PU', rsa_id}, ['request_id'], [booking_id] );
+        await updateRecord('portable_charger_booking', {status: 'PU', rsa_id}, ['booking_id'], [booking_id] );
         if(checkOrder.pod_id) {
             await updateRecord('pod_devices', { latitude, longitude}, ['pod_id'], [checkOrder.pod_id] );
         }
-        // const invoiceId   = booking_id.replace('RAO', 'INVRAO');
-        const bookingData = await getTotalAmountFromService(booking_id, 'RSA');
+        // const invoiceId   = booking_id.replace('PCB', 'INVPC');
+        const bookingData = await getTotalAmountFromService(booking_id, 'PCB');
         
         // const data = {
         //     invoice_id   : invoiceId,
@@ -410,7 +445,7 @@ const chargerPickedUp = async (req, resp) => {
         // const invoiceData  = { data, numberToWords, formatNumber  };
         // const templatePath = path.join(__dirname, '../../views/mail/portable-charger-invoice.ejs');
         // const filename     = `${invoiceId}-invoice.pdf`;
-        // const savePdfDir   = 'road-side-invoice';
+        // const savePdfDir   = 'portable-charger-invoice';
         // const pdf          = await generatePdf(templatePath, invoiceData, filename, savePdfDir, req);
 
         // if(!pdf || !pdf.success){
@@ -420,20 +455,22 @@ const chargerPickedUp = async (req, resp) => {
             const html = `<html>
                 <body>
                     <h4>Dear ${bookingData.data.rider_name}</h4>
-                    <p>We hope you're doing well.</p>
-                    <p>Thank you for choosing PlusX Electric for your EV Roadside Assistance service. We're pleased to inform you that the service has been successfully completed.</p>
-                    <p>We truly appreciate your trust in us and look forward to serving you again.</p>
-                    <p>Best Regards,<br/>PlusX Electric Team </p>
+                    <p>We hope you're doing well!</p>
+                    <p>Thank you for choosing PlusX Electric for your Portable EV Charger service. We're pleased to inform you that the service has been successfully completed.</p>
+                    <p>We truly appreciate your trust in us and look forward to serving you again in the future.</p>
+                    <p> Regards,<br/>PlusX Electric Team </p>
                 </body>
             </html>`;
             // , and the details of your invoice are attached
             // const attachment = {
             //     filename: `${invoiceId}-invoice.pdf`, path: pdf.pdfPath, contentType: 'application/pdf'
             // };
-            emailQueue.addEmail(bookingData.data.rider_email, 'PlusX Electric: Your EV Roadside Assistance Service is Now Complete', html);  //, attachment
-        // }
         
-        return resp.json({ message: ['Charger picked-up successfully!'], status: 1, code: 200 });
+            emailQueue.addEmail(bookingData.data.rider_email, 'PlusX Electric: Your Portable EV Charger Service is Now Complete', html);  //, attachment
+        // }
+        await portableChargerInvoice(checkOrder.rider_id, booking_id); 
+        
+        return resp.json({ message: ['Portable Charger picked-up successfully!'], status: 1, code: 200 });
     } else {
         return resp.json({ message: ['Sorry this is a duplicate entry!'], status: 0, code: 200 });
     }
@@ -443,9 +480,9 @@ const reachedOffice = async (req, resp) => {
     
     const checkOrder = await queryDB(`
         SELECT rider_id, 
-            (select pod_id from road_assistance as rs where rs.request_id = order_assign.order_id limit 1) as pod_id
+            (select pod_id from portable_charger_booking as pb where pb.booking_id = portable_charger_booking_assign.order_id limit 1) as pod_id
         FROM 
-            order_assign
+            portable_charger_booking_assign
         WHERE 
             order_id = ? AND rsa_id = ? AND status = 1
         LIMIT 1
@@ -455,17 +492,17 @@ const reachedOffice = async (req, resp) => {
         return resp.json({ message: [`Sorry no booking found with this booking id ${booking_id}`], status: 0, code: 404 });
     }
     const ordHistoryCount = await queryDB(
-        'SELECT COUNT(*) as count FROM order_history WHERE rsa_id = ? AND order_status = "RO" AND order_id = ?', [rsa_id, booking_id]
+        'SELECT COUNT(*) as count FROM portable_charger_history WHERE rsa_id = ? AND order_status = "RO" AND booking_id = ?', [rsa_id, booking_id]
     );
     if (ordHistoryCount.count === 0) {
         const insert = await db.execute(
-            'INSERT INTO order_history (order_id, rider_id, order_status, rsa_id, latitude, longitude) VALUES (?, ?, "RO", ?, ?, ? )',
+            'INSERT INTO portable_charger_history (booking_id, rider_id, order_status, rsa_id, latitude, longitude) VALUES (?, ?, "RO", ?, ?, ? )',
             [booking_id, checkOrder.rider_id, rsa_id, latitude, longitude]
         );
         if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
 
-        await updateRecord('road_assistance', {order_status: 'RO', rsa_id}, ['request_id'], [booking_id] );
-        await db.execute(`DELETE FROM order_assign WHERE rsa_id = ? and order_id = ?`, [rsa_id, booking_id]);
+        await updateRecord('portable_charger_booking', {status: 'RO', rsa_id}, ['booking_id'], [booking_id] );
+        await db.execute(`DELETE FROM portable_charger_booking_assign WHERE rsa_id = ? and order_id = ?`, [rsa_id, booking_id]);
         
         if(checkOrder.pod_id) {
             await updateRecord('pod_devices', { latitude, longitude}, ['pod_id'], [checkOrder.pod_id] );
@@ -475,6 +512,38 @@ const reachedOffice = async (req, resp) => {
         return resp.json({ message: ['Sorry this is a duplicate entry!'], status: 0, code: 200 });
     }
 };
+
+/* Save POD Charging History */
+export const storePodChargerHistory = asyncHandler(async (req, resp) => {
+    const { rsa_id, pod_id, charging_status, latitude, longitude } = mergeParam(req);
+    const { isValid, errors } = validateFields(mergeParam(req), {rsa_id: ["required"], pod_id: ["required"], charging_status: ["required"], latitude: ["required"], longitude: ["required"] });
+    if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
+    if (!['CS', 'CE'].includes(charging_status)) return resp.json({status:0, code:422, message:"Status should be CS or CE"});
+
+    const podBatteryData = await getPodBatteryData(pod_id);
+    const podData        = podBatteryData.data.length > 0 ? JSON.stringify(podBatteryData.data) : null;
+    const sumOfLevel     = podBatteryData.sum ?  podBatteryData.sum : '';
+    const status         = charging_status === 'CS' ? 1 : 2;
+    let   isStored       = 0;
+    
+    if(charging_status === 'CS'){
+        const insert = await insertRecord('pod_charge_history', 
+            ['pod_id', 'start_charging_level', 'pod_data_start', 'status', 'longitude', 'latitude'],
+            [pod_id, sumOfLevel, podData, status, latitude, longitude]
+        );
+        isStored = insert.affectedRows > 0 ? 1 : 0;
+    }
+    if(charging_status === 'CE'){
+        const update = await updateRecord('pod_charge_history', {end_charging_level: sumOfLevel, pod_data_end: podData, status, latitude, longitude}, ['pod_id'], [pod_id]);
+        isStored = update.affectedRows > 0 ? 1 : 0;
+    }
+
+    return resp.json({
+        status: isStored ? 1 : 0,
+        message: isStored ? 'POD charger history saved successfully' : 'Failed to store, Please Try Again.'
+    });
+
+});
 
 /* POD Battery */
 const getPodBatteryData = async (pod_id) => {
@@ -511,13 +580,13 @@ const getPodBatteryData = async (pod_id) => {
 }
 
 // ye new bana hai 
-const rsaInvoice = async (rider_id, request_id ) => {
+const portableChargerInvoice = async (rider_id, request_id ) => {
     try {
         const checkOrder = await queryDB(` SELECT payment_intent_id
             FROM 
-                road_assistance 
+                portable_charger_booking 
             WHERE 
-                request_id = ? AND rider_id = ?
+                booking_id = ? AND rider_id = ?
             LIMIT 1
         `,[request_id, rider_id]);
 
@@ -525,7 +594,7 @@ const rsaInvoice = async (rider_id, request_id ) => {
             return { status : 0  };
         }
         const payment_intent_id = checkOrder.payment_intent_id;
-        const invoiceId         = request_id.replace('RAO', 'INVRAO');
+        const invoiceId         = request_id.replace('PCB', 'INVPC');
         const createObj = {
             invoice_id     : invoiceId,
             request_id     : request_id,
@@ -551,15 +620,15 @@ const rsaInvoice = async (rider_id, request_id ) => {
             createObj.charge_id         = charge.id;  
             createObj.transaction_id    = charge.payment_method_details.card.three_d_secure?.transaction_id || null;  
             createObj.payment_type      = charge.payment_method_details.type;  
-            createObj.currency          = charge.currency;
+            createObj.currency          = charge.currency;  
             createObj.invoice_date      = moment.unix(charge.created).format('YYYY-MM-DD HH:mm:ss');
             createObj.receipt_url       = charge.receipt_url;
             createObj.card_data         = cardData;
         }
-        // console.log(createObj); 
+        console.log(createObj);
         const columns = Object.keys(createObj);
         const values  = Object.values(createObj);
-        const insert  = await insertRecord('road_assistance_invoice', columns, values);
+        const insert  = await insertRecord('portable_charger_invoice', columns, values);
         
         return { status: (insert.affectedRows > 0) ? 1 : 0 };
         

@@ -64,13 +64,13 @@ export const shopList = asyncHandler(async (req, resp) => {
     const [shopsData] = await db.execute(query, queryParams);
 
     resp.json({
-        message : ["Shop List fetched successfully!"],
-        data       : shopsData,
-        total      : total,
-        total_page : totalPage,
-        status     : 1,
-        code       : 200,
-        base_url   : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/shop-images/`,
+        message: ["Shop List fetched successfully!"],
+        data: shopsData,
+        total: total,
+        total_page: totalPage,
+        status: 1,
+        code: 200,
+        base_url: `${req.protocol}://${req.get('host')}/uploads/shop-images/`,
     });
 });
 
@@ -120,6 +120,6 @@ export const shopDetail = asyncHandler(async (req, resp) => {
         store_data: shop,
         gallery_data: imgName,
         address: address,
-        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/shop-images/`,
+        base_url: `${req.protocol}://${req.get('host')}/uploads/shop-images/`,
     });
 });

@@ -79,8 +79,8 @@ export const discussionBoardDetail = asyncHandler(async (req, resp) => {
         code: 200, 
         board, 
         comments, 
-        base_url : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/discussion-board-images/`,
-        message  : "Discussion Board Detail fetch successfully!"});
+        base_url: `${req.protocol}://${req.get('host')}/uploads/discussion-board-images/`,
+        message: "Discussion Board Detail fetch successfully!"});
 });
 
 export const discussionBoardDelete = asyncHandler(async (req, resp) => {

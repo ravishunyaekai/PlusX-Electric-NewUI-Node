@@ -125,7 +125,7 @@ export const offerClickhistory = async (req, resp) => {
         const startIndex = parseInt((page_no * limit) - limit, 10);
         
         let whereQry = '';
-        if (start_date && end_date) {  //2025-01-13 20:00:01 2025-01-14 19:59:59
+        if (start_date && end_date) {
 
             const startToday = new Date(start_date);
             const startFormattedDate = `${startToday.getFullYear()}-${(startToday.getMonth() + 1).toString()

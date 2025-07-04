@@ -1,45 +1,45 @@
+
 import { Router } from "express";
 import { handleFileUpload } from "../fileUpload.js";
 import multer from "multer";
 import { apiAuthorization } from '../middleware/apiAuthorizationMiddleware.js';
 import { apiAuthentication } from '../middleware/apiAuthenticationMiddleware.js';
 
-import { clubList, clubDetail } from '../controller/api/ClubController.js';
-import { shopList, shopDetail } from '../controller/api/ShopController.js';
-import { offerList, offerDetail, offerHistory } from '../controller/api/OfferController.js';
-import { redeemCoupon, createIntent, createPortableChargerSubscription, addCardToCustomer, customerCardsList, removeCard, autoPay, getPaymentSession, savedcardPayment  } from '../controller/PaymentController.js';
-import { carList, carDetail } from '../controller/api/ElectricCarRentalController.js';
-import { bikeList, bikeDetail } from '../controller/api/ElectricBikeRentalController.js';
-import { stationList, stationDetail, nearestChargerList } from '../controller/api/ChargingStationController.js';
-import { serviceRequest, requestList, requestDetails } from '../controller/api/ChargingInstallationServiceController.js';
-import { rsaInvoice, pickAndDropInvoice, portableChargerInvoice, preSaleTestingInvoice, chargerInstallationInvoice } from '../controller/InvoiceController.js';
+import { clubList, clubDetail } from '../controller/plusx-06-api/ClubController.js';
+import { shopList, shopDetail } from '../controller/plusx-06-api/ShopController.js';
+import { offerList, offerDetail, offerHistory } from '../controller/plusx-06-api/OfferController.js';
+import { redeemCoupon, createIntent, createPortableChargerSubscription, addCardToCustomer, customerCardsList, removeCard, autoPay, getPaymentSession, savedcardPayment  } from '../controller/PlusXPaymentController.js';
+import { carList, carDetail } from '../controller/plusx-06-api/ElectricCarRentalController.js';
+import { bikeList, bikeDetail } from '../controller/plusx-06-api/ElectricBikeRentalController.js';
+import { stationList, stationDetail, nearestChargerList } from '../controller/plusx-06-api/ChargingStationController.js';
+import { serviceRequest, requestList, requestDetails } from '../controller/plusx-06-api/ChargingInstallationServiceController.js';
+import { rsaInvoice, pickAndDropInvoice, portableChargerInvoice, preSaleTestingInvoice, chargerInstallationInvoice } from '../controller/PlusXInvoiceController.js';
 
-import { addInsurance, insuranceList, insuranceDetails, evPreSaleBooking, evPreSaleList, evPreSaleDetails, preSaleSlotList } from '../controller/api/EvInsuranceController.js';
+import { addInsurance, insuranceList, insuranceDetails, evPreSaleBooking, evPreSaleList, evPreSaleDetails, preSaleSlotList } from '../controller/plusx-06-api/EvInsuranceController.js';
 import { 
     login, register, forgotPassword, createOTP, verifyOTP, home, getRiderData, updateProfile, deleteImg, logout, updatePassword, locationList, locationAdd, notificationList, 
     addRiderAddress, riderAddressList, deleteRiderAddress, deleteAccount, addRiderVehicle ,editRiderVehicle, riderVehicleList, deleteRiderVehicle, editRiderAddress, defaultAddress, defaultVehicle
-} from "../controller/api/RiderController.js";
+} from "../controller/plusx-06-api/RiderController.js";
 import {
     addRoadAssistance, roadAssistanceList, roadAssistanceDetail, roadAssistanceInvoiceList, roadAssistanceInvoiceDetail, userFeedbacRSABooking 
-} from '../controller/api/RoadAssistanceController.js';
+} from '../controller/plusx-06-api/RoadAssistanceController.js';
 import { 
     addDiscussionBoard, getDiscussionBoardList, getDiscussionBoardDetail, addComment, replyComment, boardLike, boardView, boardShare, votePoll, reportOnBoard, 
     boardNotInterested, boardDelete, editBoard, editPoll, deleteComment, deleteReplyComment, commentLike, replyCommentLike
-} from '../controller/api/DiscussionBoardController.js';
+} from '../controller/plusx-06-api/DiscussionBoardController.js';
 
 import {vehicleList, vehicleDetail, interestedPeople, areaList, sellVehicle, allSellVehicleList, sellVehicleList,
-    sellVehicleDetail, updateSellVehicle, deleteSellVehicle, soldSellVehicle, reminder_sell_vehicle_list, vehicleModelList, vehicleBrandList, updateSellVehicleImg, dubaiAreaList
-} from '../controller/api/VehicleController.js';
+    sellVehicleDetail, updateSellVehicle, deleteSellVehicle, soldSellVehicle, reminder_sell_vehicle_list, vehicleModelList, vehicleBrandList, updateSellVehicleImg
+} from '../controller/plusx-06-api/VehicleController.js';
 import { 
     chargerList, chargerBooking, chargerBookingList,chargerBookingDetail, invoiceList, getPcSlotList, getPcSubscriptionList, userCancelPCBooking,
     reScheduleBooking, userFeedbackPCBooking
-} from '../controller/api/PortableChargerController.js';
+} from '../controller/plusx-06-api/PortableChargerController.js';
 import { 
-    getChargingServiceSlotList, requestService, listServices, getServiceOrderDetail, getInvoiceList, getInvoiceDetail, cancelValetBooking, userFeedbackValetBooking, rescheduleService
-} from '../controller/api/ChargingServiceController.js';
+    getChargingServiceSlotList, requestService, listServices, getServiceOrderDetail, getInvoiceList, getInvoiceDetail, cancelValetBooking, userFeedbackValetBooking
+} from '../controller/plusx-06-api/ChargingServiceController.js';
 
-// import { failedPODBooking, failedValetBooking } from '../controller/TestController.js';  
-import { responseContent } from '../controller/api/ContentController.js';
+import { failedPODBooking, failedValetBooking } from '../controller/TestController.js';  //getPaymentSessionData, getPaymentdetails, 
 
 import rateLimit from 'express-rate-limit';
 const router = Router();
@@ -73,8 +73,6 @@ const authzRoutes = [
     { method: 'get',  path: '/reminder-sell-vehicle-list', handler: reminder_sell_vehicle_list },
     { method: 'post', path: '/vehicle-brand-list',         handler: vehicleBrandList },
     { method: 'post', path: '/vehicle-model-list',         handler: vehicleModelList },
-    { method: 'get',  path: '/dubai-area-list',            handler: dubaiAreaList },
-    { method: 'get',  path: '/response-content',           handler: responseContent },
 ];
 authzRoutes.forEach(({ method, path, handler }) => {
     const middlewares = [apiAuthorization];  // rateLimit
@@ -181,7 +179,6 @@ const authzAndAuthRoutes = [
     { method: 'get',  path: '/pick-and-drop-invoice-detail', handler: getInvoiceDetail },
     { method: 'post', path: '/charging-service-cancel',      handler: cancelValetBooking },
     { method: 'post', path: '/feedback-charging-service',    handler: userFeedbackValetBooking },
-    { method: 'post', path: '/reschedule-charging-service', handler: rescheduleService },
 
     /* Portable charger */
     { method: 'get',  path: '/portable-charger-list',            handler: chargerList },
@@ -234,23 +231,35 @@ authzAndAuthRoutes.forEach(({ method, path, handler }) => {
     if(path === '/rider-profile-change'){
         middlewares.push(handleFileUpload('rider_profile', ['profile_image'], 1));
     }
-    else if(path === '/sell-vehicle' || path === '/edit-sell-vehicle' || path === '/edit-sell-vehicle-img'){
+    if(path === '/sell-vehicle' || path === '/edit-sell-vehicle' || path === '/edit-sell-vehicle-img'){
         middlewares.push(handleFileUpload('vehicle-image', ['car_images', 'car_tyre_image', 'other_images', 'image'], 5));
     }
-    else if(path === '/add-discussion-board' || path === '/discussion-board-edit'){
+    if(path === '/add-discussion-board' || path === '/discussion-board-edit'){
         middlewares.push(handleFileUpload('discussion-board-images', ['image'], 5));
     }
-    else if(path === '/ev-pre-sale-testing' || path === '/board-vote-edit'){
+    if(path === '/ev-pre-sale-testing' || path === '/board-vote-edit'){
         const noUpload1 = multer(); middlewares.push(noUpload1.none()); 
     }
-    else if(path === '/add-insurance'){
+    if(path === '/add-insurance'){
         middlewares.push(handleFileUpload('insurance-images', ['vehicle_registration_img', 'driving_licence', 'car_images', 'car_type_image', 'scretch_image', 'emirates_id'], 5));
     }
+    
     middlewares.push(apiAuthorization);
     middlewares.push(apiAuthentication);
     router[method](path, ...middlewares, handler);
 });
+
 router.post('/validate-coupon', redeemCoupon);
 router.post('/auto-pay', autoPay);
+// router.post('/add-card', addCardToCustomer);
+// router.post('/remove-card', removeCard);
+// router.post('/list-card', customerCardsList);
+
+// router.get('/get-payment-session-data', getPaymentSessionData); 
+// router.get('/get-payment-data', getPaymentdetails); 
+
+
+router.post('/failed-pod-booking', failedPODBooking); 
+router.post('/failed-valet-booking', failedValetBooking); 
 
 export default router;

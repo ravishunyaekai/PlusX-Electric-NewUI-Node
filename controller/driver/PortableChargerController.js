@@ -74,11 +74,11 @@ export const rsaBookingStage = asyncHandler(async (req, resp) => {
     return resp.json({
         status: 1,
         code: 200,
-        message: ["Booking stage fetch successfully."],
-        booking_status: booking.status,
-        execution_time: humanReadableDuration,
-        booking_history: bookingTracking,
-        image_path: `${process.env.DIR_UPLOADS}portable-charger/`
+        message         : ["Booking stage fetch successfully."],
+        booking_status  : booking.status,
+        execution_time  : humanReadableDuration,
+        booking_history : bookingTracking,
+        image_path      : `${process.env.DIR_UPLOADS}portable-charger/`
     });
     
 });
@@ -183,7 +183,7 @@ const acceptBooking = async (req, resp) => {
 
         const href    = `portable_charger_booking/${booking_id}`;
         const title   = 'Portable Charging Booking!';
-        const message = `Booking Accepted! (${booking_id})`;
+        const message = `Booking Accepted! ${booking_id}`;
         await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
       //  await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
@@ -275,7 +275,7 @@ const reachedLocation = async (req, resp) => {
         const href    = `portable_charger_booking/${booking_id}`;
         const title   = 'Portable Charging Booking!';
         const message = `The POD has arrived. Please unlock your EV.`;
-        await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
+         await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
         // await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
@@ -337,15 +337,25 @@ const chargingStart = async (req, resp) => {
 const chargingComplete = async (req, resp) => {
     const { booking_id, rsa_id, latitude, longitude } = mergeParam(req);
     
+    // const checkOrder = await queryDB(`
+    //     SELECT rider_id, 
+    //         (SELECT fcm_token FROM riders WHERE rider_id = portable_charger_booking_assign.rider_id limit 1) AS fcm_token,
+    //         (SELECT pod_id FROM portable_charger_booking as pcb WHERE pcb.booking_id = portable_charger_booking_assign.order_id limit 1) AS pod_id
+    //     FROM 
+    //         portable_charger_booking_assign
+    //     WHERE 
+    //         order_id = ? AND rsa_id = ? AND status = 1
+    //     LIMIT 1
+    // `,[booking_id, rsa_id]);
     const checkOrder = await queryDB(`
-        SELECT rider_id, 
-            (SELECT fcm_token FROM riders WHERE rider_id = portable_charger_booking_assign.rider_id limit 1) AS fcm_token,
-            (SELECT pod_id FROM portable_charger_booking as pcb WHERE pcb.booking_id = portable_charger_booking_assign.order_id limit 1) AS pod_id
-        FROM 
-            portable_charger_booking_assign
-        WHERE 
-            order_id = ? AND rsa_id = ? AND status = 1
-        LIMIT 1
+        SELECT 
+    pcba.rider_id, r.rider_name, r.rider_email,r.fcm_token,
+    (SELECT pcb.pod_id FROM portable_charger_booking AS pcb WHERE pcb.booking_id = pcba.order_id LIMIT 1) AS pod_id
+FROM 
+portable_charger_booking_assign AS pcba
+LEFT JOIN  riders AS r ON r.rider_id = pcba.rider_id
+    WHERE pcba.order_id = ? AND pcba.rsa_id = ? AND pcba.status = 1
+LIMIT 1
     `,[booking_id, rsa_id]);
 
     if (!checkOrder) {
@@ -387,8 +397,6 @@ const chargingComplete = async (req, resp) => {
             </body>
         </html>`;
         emailQueue.addEmail(checkOrder.rider_email, 'PlusX Electric: Your Portable EV Charger Service is Now Complete', html); 
-
-
 
         return resp.json({ message: [`Charging complete. Don't forget to lock your EV.`], status: 1, code: 200 });
     } else {

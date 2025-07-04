@@ -8,12 +8,12 @@ export const sellVehicleList = asyncHandler(async (req, resp) => {
     const { search_text, page_no } = req.body;
 
     const result = await getPaginatedData({
-        tableName : 'vehicle_sell',
-        columns   : `sell_id, region, milage, price, body_type, engine_capacity, car_images, vehicle_id,
-            (select concat(vehicle_model, "-", vehicle_make) from riders_vehicles as rv 
-            where rv.vehicle_id = vehicle_sell.vehicle_id) as vehicle_data,
-            (select concat(rider_name, ",", country_code, "-", rider_mobile) from riders as r 
-            where r.rider_id = vehicle_sell.rider_id) as rider_data`,
+        tableName: 'vehicle_sell',
+        columns: `sell_id, region, milage, price, body_type, engine_capacity, car_images, vehicle_id,
+                  (select concat(vehicle_model, "-", vehicle_make) from riders_vehicles as rv 
+                  where rv.vehicle_id = vehicle_sell.vehicle_id) as vehicle_data,
+                  (select concat(rider_name, ",", country_code, "-", rider_mobile) from riders as r 
+                where r.rider_id = vehicle_sell.rider_id) as rider_data`,
         joinTable: 'riders',
         joinCondition: 'vehicle_sell.rider_id = riders.rider_id',
         liveSearchFields: ['riders.rider_name', 'vehicle_sell.body_type'],
@@ -30,7 +30,7 @@ export const sellVehicleList = asyncHandler(async (req, resp) => {
         total_page: result.totalPage,
         status: 1,
         code: 200,
-        image_path: `${process.env.DIR_UPLOADS}/vehicle-image/`
+        image_path: `${process.env.DIR_UPLOADS}vehicle-image/`
     });
 });
 
@@ -60,6 +60,6 @@ export const sellVehicleDetail = asyncHandler(async (req, resp) => {
         code: 200,
         message: ["Car Sell detail fetched successfully!"],
         data: data,
-        base_url: `${process.env.DIR_UPLOADS}/vehicle-images/`,
+        base_url: `${process.env.DIR_UPLOADS}vehicle-images/`,
     });
 });

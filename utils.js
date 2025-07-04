@@ -562,3 +562,36 @@ export const  ResponseData=(resp,status, code, message, data = {})=> {
         ...data
     });
 }
+
+const notificationData = async (module_name, sub_module, response_type, content_id) => {
+    let fields = ['content'];
+
+    if (response_type === 'notification') {
+        fields.push('heading');
+    }
+
+    // Join fields to build SELECT query
+    const query = `
+        SELECT ${fields.join(', ')}
+        FROM response_content
+        WHERE module_name = ? AND sub_module = ? AND content_id = ? AND status = 1
+    `;
+
+    const result = await db.query(query, [module_name, sub_module, content_id]);
+
+    if (!result || result.length === 0) return null;
+
+    const row = result[0];
+    let data = {};
+
+    if (response_type === 'alert') {
+        data.content = row.content;
+    } else if (response_type === 'notification') {
+        data = {
+            heading: row.heading,
+            content: row.content
+        };
+    }
+
+    return data;
+};

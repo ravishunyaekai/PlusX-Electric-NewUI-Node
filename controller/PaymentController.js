@@ -257,7 +257,6 @@ export const autoPay = async (req, resp) => {
         tryCatchErrorHandler(err, resp);
     }
 };
-
 export const redeemCoupon = async (req, resp) => {
     const {rider_id, amount, booking_type, coupon_code } = mergeParam(req);
     
@@ -295,11 +294,11 @@ export const redeemCoupon = async (req, resp) => {
         const total_amt = amount - dis_price;
         
         data.dis_price  = dis_price;
-        data.t_vat_amt  = Math.round(( total_amt ) * 5) / 100;
+        data.t_vat_amt  = Math.floor(( total_amt ) * 5) / 100;
         data.total_amt  = total_amt + data.t_vat_amt;
 
     } else {
-        data.t_vat_amt  = Math.round(( amount ) * 5) / 100;
+        data.t_vat_amt  = Math.floor(( amount ) * 5) / 100;
         const total_amt  = parseFloat(amount) + parseFloat( data.t_vat_amt ); 
 
         const dis_price = ( total_amt * coupon.coupan_percentage)/100;
@@ -321,6 +320,56 @@ export const redeemCoupon = async (req, resp) => {
         message           : ['Your discount has been successfully applied. Enjoy the savings!'],
         status            : 1,
         code              : 200
+    });
+};
+export const redeemCouponOld = async (req, resp) => {
+    const {rider_id, amount, booking_type, coupon_code } = mergeParam(req);
+    
+    const { isValid, errors } = validateFields(mergeParam(req), {
+        rider_id     : ["required"], 
+        amount       : ["required"],
+        booking_type : ["required"],
+        coupon_code  : ["required"],
+    });
+    if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
+    const [[{ count }]] = await db.execute('SELECT COUNT(*) AS count FROM coupon WHERE coupan_code = ?',[coupon_code]);
+    if (count === 0) return resp.json({ status: 0, code: 422, message: ['The coupon code you entered does not exist in our records.'] });
+
+    const coupon = await queryDB(`
+        SELECT
+            coupan_percentage, end_date, user_per_user, status, booking_for, 
+            (SELECT count(id) FROM coupon_usage AS cu WHERE cu.coupan_code = coupon.coupan_code AND user_id = ?) as use_count
+        FROM coupon
+        WHERE coupan_code = ?
+        LIMIT 1
+    `, [rider_id, coupon_code]); 
+
+    if (moment(coupon.end_date).isBefore(moment(), 'day') || coupon.status < 1){
+        return resp.json({ errors: {coupon_code: ["Coupon is invalid or expired."]} });
+
+    } else if(coupon.booking_for != booking_type){
+        return resp.json({ errors: {booking_type: ["Coupon code is invalid for this booking type."]} });
+
+    } else if(coupon.use_count >= coupon.user_per_user){
+        return resp.json({ errors: {coupon_code: ["Coupon per user limit exceeded."]} });
+    }
+    // const t_vat_amt   = ( coupon.coupan_percentage == parseFloat(100) ) ? 0 : Math.floor(( amount ) * 5) / 100; 
+    const t_vat_amt   = Math.floor(( amount ) * 5) / 100; 
+    const totalAmount = parseFloat(amount) + parseFloat( t_vat_amt );  
+    
+    const disAmount   = (totalAmount * coupon.coupan_percentage)/100;
+    const finalAmount = totalAmount - disAmount;
+
+    return resp.json({
+        bookingAmount : formatNumber(amount),
+        vat_amt       : formatNumber(t_vat_amt),
+        totalAmount   : formatNumber(totalAmount),
+        discount      : formatNumber(disAmount),
+        data          : formatNumber(finalAmount),  //formatNumber(finalAmount),
+        coupan_percentage : coupon.coupan_percentage,
+        message       : [],
+        status        : 1,
+        code          : 200
     });
 };
 

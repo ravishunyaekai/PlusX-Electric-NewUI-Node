@@ -44,7 +44,7 @@ export const bikeDetail = asyncHandler(async (req, resp) => {
         bike, 
         galleryData : imgName,
         galleryId : imgId,
-        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/bike-rental-images/`
+        base_url: `${req.protocol}://${req.get('host')}/uploads/bike-rental-images/`
     });
 });
 

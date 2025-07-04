@@ -305,11 +305,11 @@ export const rsaAssignBooking = async (req, resp) => {
        
         const href    = 'road_assistance/' + booking_id;
         const heading = 'EV Roadside Assistance';
-        const desc    = `Booking Assigned: (${booking_id})`;
-        //createNotification(heading, desc, 'Roadside Assistance', 'Rider', 'Admin', '', booking_data.rider_id, href);
-            //pushNotification(booking_data.fcm_token, heading, desc, 'RDRFCM', href);
+        const desc    = `Booking Assigned : ${booking_id}`;
+        // createNotification(heading, desc, 'Roadside Assistance', 'Rider', 'Admin', '', booking_data.rider_id, href);
+        // pushNotification(booking_data.fcm_token, heading, desc, 'RDRFCM', href);
 
-        const desc1 = `Booking Assigned: (${booking_id})`;
+        const desc1 = `Booking Assigned : ${booking_id}`;
         createNotification(heading, desc1, 'Roadside Assistance', 'RSA', 'Admin', '', rsa_id, href);
         if(rsa.fcm_token) {
             pushNotification(rsa.fcm_token, heading, desc1, 'RSAFCM', href);
@@ -418,6 +418,7 @@ export const failedRSABookingDetails = async (req, resp) => {
         if (bookingResult.length === 0) {
             return resp.json({ status : 0, code : 404, message : ['Booking not found.'] });
         } 
+        
         if(bookingResult.vehicle_data == '' || bookingResult.vehicle_data == null) {
             const vehicledata = await queryDB(`
                 SELECT                 
@@ -428,6 +429,7 @@ export const failedRSABookingDetails = async (req, resp) => {
                     rider_id = ? and vehicle_id = ? 
                 LIMIT 1 `,
             [ bookingResult.rider_id, bookingResult.vehicle_id ]);
+            
             if(vehicledata) {
                 bookingResult.vehicle_data = vehicledata.vehicle_make + ", " + vehicledata.vehicle_model+ ", "+ vehicledata.vehicle_specification+ ", "+ vehicledata.emirates+ "-" + vehicledata.vehicle_code + "-"+ vehicledata.vehicle_number ;
             }

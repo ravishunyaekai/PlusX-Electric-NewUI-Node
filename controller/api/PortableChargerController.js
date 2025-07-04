@@ -36,7 +36,7 @@ export const chargerList = asyncHandler(async (req, resp) => {
         slot_data  : slotData,
         total_page : result.totalPage,
         total      : result.total,
-        base_url   : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/portable-charger/`,
+        base_url   : `${process.env.DIR_UPLOADS}portable-charger/`,
     });
 });
 
@@ -266,7 +266,7 @@ export const chargerBookingList = asyncHandler(async (req, resp) => {
         inProcessBookingList,
         status     : 1,
         code       : 200,
-        base_url   : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/portable-charger/`,
+        base_url    : `${process.env.DIR_UPLOADS}portable-charger/`,
         noResultMsg : 'There are no recent bookings. Please schedule your booking now.'
     });
 });
@@ -286,10 +286,6 @@ export const chargerBookingDetail = asyncHandler(async (req, resp) => {
         LIMIT 1`, 
     [rider_id, booking_id]);
 
-    if (booking && ( booking.status == 'CS' || booking.status == 'PU' || booking.status == 'RO' ) ) {
-        const invoice_id = booking.booking_id.replace('PCB', 'INVPC');
-        booking.invoice_url = `https://plusx.s3.ap-south-1.amazonaws.com/public/portable-charger-invoice/${invoice_id}-invoice.pdf`;
-    }
     if(booking.vehicle_data == '' || booking.vehicle_data == null) {
         const vehicledata = await queryDB(`
             SELECT                 
@@ -351,7 +347,7 @@ export const getPcSubscriptionList = asyncHandler(async (req, resp) => {
         status: 1,
         subscription_price: sPrice,
         code: 200,
-        subscription_img: `https://plusx.s3.ap-south-1.amazonaws.com/public/pod-no-subscription.jpeg`,
+        subscription_img: `${req.protocol}://${req.get('host')}/public/pod-no-subscription.jpeg`,
     });
 });
 
@@ -388,7 +384,6 @@ export const invoiceList = asyncHandler(async (req, resp) => {
         data       : result.data,
         total_page : result.totalPage,
         total      : result.total,
-        base_url   : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/offer/`,
     });
 });
 export const invoiceDetails = asyncHandler(async (req, resp) => {
@@ -409,8 +404,6 @@ export const invoiceDetails = asyncHandler(async (req, resp) => {
         WHERE 
             pci.invoice_id = ?
     `, [invoice_id]);
-
-    invoice.invoice_url = `https://plusx.s3.ap-south-1.amazonaws.com/uploads/portable-charger-invoice/${invoice_id}-invoice.pdf`;
 
     return resp.json({
         message : ["Pick & Drop Invoice Details fetch successfully!"],
@@ -463,7 +456,7 @@ export const userCancelPCBooking = asyncHandler(async (req, resp) => {
  
     const href    = `portable_charger_booking/${booking_id}`;
     const title   = 'Portable Charging Booking!';
-    const message = `Booking Cancelled!(${booking_id})`;
+    const message = `Booking Cancelled: ${booking_id}`;
     await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'Rider',  rider_id, '', href);
  
     if(checkOrder.rsa_id) {
@@ -535,8 +528,10 @@ export const userFeedbackPCBooking = asyncHandler(async (req, resp) => {
         if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
         
         const href    = `portable_charger_booking/${booking_id}`;
-        const title   = 'Portable Charger Feedback!';
-        const message = `Feedback Received - Booking ID: ${booking_id}.`;
+        // const title   = 'Portable Charger Feedback!';
+        // const message = `Feedback Received - Booking ID: ${booking_id}.`;
+        const title   = `Feedback Received- ${booking_id}`;
+        const message = `You've received feedback from a customer`;
         await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'Rider', rider_id, '', href);
 
         const adminHtml = `<html>
@@ -558,6 +553,7 @@ export const userFeedbackPCBooking = asyncHandler(async (req, resp) => {
         return resp.json({ message: ['Feedback already submitted!'], status: 0, code: 200 });
     }
 });
+
 
 export const reScheduleBooking = asyncHandler(async (req, resp) => {
     
@@ -652,17 +648,15 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
             device_name         : device_name,
             rescheduled_booking : 1
         }
-        await updateRecord('portable_charger_booking', updtFields, ['booking_id', 'rider_id'], [booking_id, rider_id]); 
-
-        await updateRecord('portable_charger_booking_assign', {slot_date_time : fSlotDateTime}, ['order_id', 'rider_id'], [booking_id, rider_id]);
-        
-        const insert = await insertRecord('portable_charger_history', ['booking_id', 'rider_id', 'order_status'], [booking_id, rider_id, 'CNF']);  //, conn
+        await updateRecord('portable_charger_booking', updtFields, ['booking_id', 'rider_id'], [booking_id, rider_id]); //, conn 
+        await updateRecord('portable_charger_booking_assign', { slot_date_time : fSlotDateTime }, ['order_id', 'rider_id'], [booking_id, rider_id]);
+        const insert = await insertRecord('portable_charger_history', ['booking_id', 'rider_id', 'order_status'], [booking_id, rider_id, 'CNF']);
         
         if(insert.affectedRows == 0) return resp.json({status:0, code:200, message: ["Oops! Something went wrong. Please try again."]});
 
         const href    = 'portable_charger_booking/' + booking_id;
         const heading = 'Portable Charging Booking!';
-        const desc    = `Rescheduled Booking Confirmed! (${booking_id})`;
+        const desc    = `Rescheduled Booking Confirmed! ${booking_id}`;
         createNotification(heading, desc, 'Portable Charging Booking', 'Rider', 'Admin','', rider_id, href);
         createNotification(heading, desc, 'Portable Charging Booking', 'Admin', 'Rider',  rider_id, '', href);
         pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);

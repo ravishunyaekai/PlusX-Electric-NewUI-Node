@@ -9,6 +9,7 @@ import fs from 'fs';
 import bcrypt from "bcryptjs";
 import moment from 'moment';
 
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -86,7 +87,7 @@ export const rsaData = asyncHandler(async (req, resp) => {
         bookingType,
         // bookingHistory,
         locationHistory,
-        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/rsa_images/`
+        base_url: `${req.protocol}://${req.get('host')}/uploads/rsa_images/`
     });
 });
 export const driverBookingList = async (req, resp) => {
@@ -207,7 +208,6 @@ export const rsaAdd = asyncHandler(async (req, resp) => {
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
     if(password.length < 6) return resp.json({status:1, code: 422, message:["Password must be 6 digit"]});
     if(password != confirm_password) return resp.json({ status: 0, code: 422, message: ['Password and confirm password not matched!'] });
-
     const mobileCheck = await db.query(`
         SELECT 
             rsa_id 

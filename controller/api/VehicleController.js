@@ -6,6 +6,9 @@ import generateUniqueId from 'generate-unique-id';
 import { asyncHandler, deleteFile, mergeParam } from '../../utils.js';
 import { queryDB, getPaginatedData, insertRecord, updateRecord } from '../../dbUtils.js';
 
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { tryCatchErrorHandler } from "../../middleware/errorHandler.js";
 
 export const vehicleList = asyncHandler(async (req, resp) => {
@@ -27,13 +30,13 @@ export const vehicleList = asyncHandler(async (req, resp) => {
     });
 
     return resp.json({
-        status: 1,
-        code: 200,
-        message: ["Vehicle List fetched successfully!"],
-        data: result.data,
-        total_page: result.totalPage,
-        total: result.total,
-        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/vehicle-image/`
+        status     : 1,
+        code       : 200,
+        message    : ["Vehicle List fetched successfully!"],
+        data       : result.data,
+        total_page : result.totalPage,
+        total      : result.total,
+        base_url   : `${process.env.DIR_UPLOADS}vehicle-image/`
     });
 });
 
@@ -53,7 +56,7 @@ export const vehicleDetail = asyncHandler(async (req, resp) => {
         message: ["Charging Station Details fetched successfully!"],
         data: vehicleData,
         gallery_data: imgName,
-        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/vehicle-image/`,
+        base_url: `${process.env.DIR_UPLOADS}vehicle-image/`,
     });
 
 });
@@ -182,7 +185,7 @@ export const allSellVehicleList = asyncHandler(async (req, resp) => {
         total_page: result.totalPage,
         status: 1,
         code: 200,
-        image_path: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/vehicle-image/`
+        image_path: `${process.env.DIR_UPLOADS}vehicle-image/`
     });
 
 });
@@ -213,7 +216,7 @@ export const sellVehicleList = asyncHandler(async (req, resp) => {
         total_page: result.totalPage,
         status: 1,
         code: 200,
-        image_path: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/vehicle-image/`
+        image_path: `${process.env.DIR_UPLOADS}vehicle-image/`
     });
 
 });
@@ -243,11 +246,11 @@ export const sellVehicleDetail = asyncHandler(async (req, resp) => {
     `,[sell_id]);
     
     return resp.json({
-        status: 1,
-        code: 200,
-        message: ["Charging Station Details fetched successfully!"],
-        sale_data: data,
-        image_path: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/vehicle-image/`,
+        status     : 1,
+        code       : 200,
+        message    : ["Charging Station Details fetched successfully!"],
+        sale_data  : data,
+        image_path : `${process.env.DIR_UPLOADS}vehicle-image/`,
     });
 
 });

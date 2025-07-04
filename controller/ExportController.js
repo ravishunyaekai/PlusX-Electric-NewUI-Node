@@ -49,14 +49,7 @@ export const donwloadPodBookingList = async (req, resp) => {
             else query += ` AND created_at BETWEEN ? AND ?`; 
             params.push(start, end);
             
-        } else {
-            const year  = moment().format("YYYY");
-            const month =  moment().format("MM");
-        
-            if (params.length === 0) query += ` WHERE MONTH(created_at) = ? AND YEAR(created_at) = ?`;
-            else query += ` AND MONTH(created_at) = ? AND YEAR(created_at) = ?`; 
-            params.push(month, year);
-        }
+        } 
         if (scheduled_start_date && scheduled_end_date) {
             const schStart = moment(scheduled_start_date, "YYYY-MM-DD").format("YYYY-MM-DD");
             const schEnd   = moment(scheduled_end_date, "YYYY-MM-DD").format("YYYY-MM-DD");
@@ -72,6 +65,13 @@ export const donwloadPodBookingList = async (req, resp) => {
             if (params.length === 0) query += ` WHERE status != ?`;
             else query += ` AND status != ?`; 
             params.push('PNR');
+        }
+        if (params.length === 0)  {
+            const year  = moment().format("YYYY");
+            const month =  moment().format("MM");
+        
+            query += ` WHERE MONTH(created_at) = ? AND YEAR(created_at) = ?`;
+            params.push(month, year);
         }
         query += ' ORDER BY id DESC ';
         
@@ -113,7 +113,7 @@ export const donwloadPodBookingList = async (req, resp) => {
 export const donwloadUserList = async (req, resp) => {
     try{
         const { addedFrom, emirates, start_date, end_date, search_text =''} = mergeParam(req);
-        
+
         let query = `
             SELECT
                 rider_id, rider_name, rider_email, country_code, rider_mobile, emirates, ${formatDateTimeInQuery(['created_at'])},
@@ -134,18 +134,12 @@ export const donwloadUserList = async (req, resp) => {
             if (params.length === 0) query += ` WHERE created_at BETWEEN ? AND ?`;
             else query += ` AND created_at BETWEEN ? AND ?`; 
             params.push(start, end);
-        } else {
-            const year  = moment().format("YYYY");
-            const month =  moment().format("MM");
-        
-            if (params.length === 0) query += ` WHERE MONTH(created_at) = ? AND YEAR(created_at) = ?`;
-            else query += ` AND MONTH(created_at) = ? AND YEAR(created_at) = ?`; 
-            params.push(month, year);
-        }
+        } 
         if(addedFrom) {
             if (params.length === 0) query += ` WHERE added_from = ?`;
             else query += ` AND added_from = ?`; 
             params.push(addedFrom);
+
         }
         if(emirates) {
 
@@ -153,10 +147,17 @@ export const donwloadUserList = async (req, resp) => {
             else query += ` AND emirates = ?`; 
             params.push(emirates);
         }
+        if (params.length === 0)  {
+            const year  = moment().format("YYYY");
+            const month =  moment().format("MM");
+        
+            query += ` WHERE MONTH(created_at) = ? AND YEAR(created_at) = ?`;
+            params.push(month, year);
+        }
         query += ' ORDER BY id DESC ';
         
         const [rows] = await db.execute(query, params);
-        
+        // return resp.json(rows);
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Sheet 1');
     

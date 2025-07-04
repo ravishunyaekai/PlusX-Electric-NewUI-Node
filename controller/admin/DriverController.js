@@ -32,6 +32,7 @@
                 code       : 200,
                 message    : ["Driver List fetch successfully!"],
                 data       : result.data,
+                // slot_data  : slotData,
                 total_page : result.totalPage,
                 total      : result.total,
                 base_url   : `${process.env.DIR_UPLOADS}driver-images/`,

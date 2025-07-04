@@ -71,6 +71,25 @@ const connectDB = async () => {
 };
 connectDB();
 
+pool.originalQuery = pool.query.bind(pool);
+
+const logQuery = async (sql, params = []) => {
+    const formatted = mysql.format(sql, params);
+    const start = process.hrtime();
+
+    const [rows, fields] = await pool.originalQuery(sql, params);
+
+    const [sec, nano] = process.hrtime(start);
+    const durationMs = (sec * 1000 + nano / 1e6).toFixed(2);
+
+    logger.info(`SQL (${durationMs} ms): ${formatted}`);
+    return [rows, fields];
+};
+
+pool.query = logQuery;
+pool.logQuery = logQuery;
+
+
 export const startTransaction = async () => {
     const connection = await pool.getConnection();
     await connection.beginTransaction();
@@ -86,4 +105,6 @@ export const rollbackTransaction = async (connection) => {
     await connection.rollback();
     connection.release();
 };
+
+
 export default pool;

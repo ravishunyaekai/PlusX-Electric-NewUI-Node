@@ -1,20 +1,16 @@
 import { Router } from "express";
 import { handleFileUpload } from "../fileUpload.js";
-// import multer from "multer";
 import { apiAuthorization } from '../middleware/apiAuthorizationMiddleware.js';
 import { apiRsaAuthentication } from '../middleware/apiRsaAuthenticationMiddleware.js';
 
 import { rsaLogin, rsaUpdatePassword, rsaForgotPassword, rsaLogout, rsaLogutAll, rsaUpdateProfile, rsaStatusChange, rsaHome, rsaBookingHistory, rsaUpdateLatLong } from '../controller/driver/RsaController.js';
 
 import { getRsaOrderStage, orderAction } from '../controller/driver/RoadAssistanceController.js';
-
 import { rsaBookingStage, bookingAction, rejectBooking, getActivePodList
-} from '../controller/driver/PortableChargerController.js';  //, storePodChargerHistory
+} from '../controller/driver/PortableChargerController.js';
 import { 
     handleBookingAction, getRsaBookingStage, handleRejectBooking 
 } from '../controller/driver/ChargingServiceController.js';
-
-import { truckFuelAction, truckList } from '../controller/driver/TruckController.js';
 
 const router = Router();
 
@@ -27,15 +23,9 @@ const authzRoutes = [
     
     /* POD */
     { method: 'get', path: '/pod-list',  handler: getActivePodList },
-
-    /* Vehicle Routes */
-    // { method: 'get',  path: '/location-area-list',         handler: areaList },
-    // { method: 'get',  path: '/reminder-sell-vehicle-list', handler: reminder_sell_vehicle_list },
-    
 ];
 authzRoutes.forEach(({ method, path, handler }) => {
     const middlewares = [apiAuthorization];
-
     router[method](path, ...middlewares, handler);
 });
 
@@ -52,7 +42,7 @@ const authzRsaAndAuthRoutes = [
 
     /* Road Assitance with RSA */
     { method: 'get', path: '/rsa-order-stage',  handler: getRsaOrderStage },
-    { method: 'post', path: '/order-action',    handler: orderAction },
+    { method: 'post', path: '/order-action',     handler: orderAction },
     
     /* Charging Service */
     { method: 'post', path: '/charger-service-action', handler: handleBookingAction },
@@ -65,14 +55,12 @@ const authzRsaAndAuthRoutes = [
     { method: 'post', path: '/portable-charger-reject',   handler: rejectBooking },
     // { method: 'post', path: '/store-pod-charger-history', handler: storePodChargerHistory },
 
-    { method: 'post', path: '/truck-fuel-action',  handler: truckFuelAction },
-    { method: 'get',  path: '/truck-list',  handler: truckList },
 
 ];
 authzRsaAndAuthRoutes.forEach(({ method, path, handler }) => {
 
     const middlewares = [];   
-    
+
     switch (path) {
         case '/portable-charger-action':
             middlewares.push(handleFileUpload('portable-charger', ['image'], 1));
@@ -86,16 +74,12 @@ authzRsaAndAuthRoutes.forEach(({ method, path, handler }) => {
         case '/order-action':
             middlewares.push(handleFileUpload('road-assistance', ['image'], 1));
             break;
-        case '/truck-fuel-action':
-            middlewares.push(handleFileUpload('truck-images', ['truck_image', 'invoice_image'], 2));
-            break;
         default:
             // console.log('Unknown booking type');
     }
     middlewares.push(apiAuthorization);
     middlewares.push(apiRsaAuthentication);
+
     router[method](path, ...middlewares, handler);
 });
-// router.post('/test-mail', bulkEmailSend);
-
 export default router;

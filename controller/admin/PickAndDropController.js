@@ -526,9 +526,9 @@ export const PodAssignBooking = async (req, resp) => {
             [booking_id, booking_data.rider_id, rsa_id, booking_data.slot_date_time, 0]);
         await updateRecord('charging_service', { rsa_id: rsa_id }, ['request_id'], [booking_id]);
 
-        const href = 'charging_service/' + booking_id;
+        const href    = 'charging_service/' + booking_id;
         const heading = 'EV Pick Up & Drop Off Booking!';
-        const desc = `Booking Assigned: (${booking_id})`;
+        const desc    = `Booking Assigned: ${booking_id}`;
         createNotification(heading, desc, 'Charging Service', 'RSA', 'Admin', '', rsa_id, href);
         // pushNotification(booking_data.fcm_to ken, heading, desc, 'RDRFCM', href);
         pushNotification(rsa.fcm_token, heading, desc, 'RSAFCM', href);

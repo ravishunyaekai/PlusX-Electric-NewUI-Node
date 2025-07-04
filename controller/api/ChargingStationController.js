@@ -56,7 +56,7 @@ export const stationList = asyncHandler(async (req, resp) => {
         total_page,
         status   : 1,
         code     : 200,
-        base_url : `${process.env.DIR_UPLOADS}charging-station-images/`
+        base_url : `${process.env.DIR_UPLOADS}charging-station-images/` //new URL('', req.protocol + '://' + req.get('host')).href
     }); 
 });
 
@@ -91,7 +91,7 @@ export const stationDetail = asyncHandler(async (req, resp) => {
     const origin       = `${latitude}, ${longitude}`;
     const destination  = `${station.latitude}, ${station.longitude}`;
     const distancedata = await getSingleRoute(origin, destination)
-    station.distance   = parseFloat(distancedata.distance );
+    station.distance   =  parseFloat(distancedata.distance);
 
     return resp.json({
         status       : 1,

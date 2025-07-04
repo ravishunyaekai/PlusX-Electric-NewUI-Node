@@ -59,7 +59,7 @@ export const guideList = asyncHandler(async (req, resp) => {
             data: result.data,
             total_page: result.totalPage,
             total: result.total,
-            base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/vehicle-image/`
+            base_url: `${req.protocol}://${req.get('host')}/uploads/vehicle-image/`
         });
 
     } catch (error) {
@@ -138,13 +138,13 @@ export const guideDetail = asyncHandler(async (req, resp) => {
         const imgId= galleryImages?.map(image => image.id);
 
         return resp.json({
-            status       : 1,
-            code         : 200,
-            message      : ["Ev Guide Details fetched successfully!"],
-            data         : vehicleDetails[0],
-            gallery_data : imgName,
-            gallery_id   : imgId,
-            base_url     : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/vehicle-image/`
+            status: 1,
+            code: 200,
+            message: ["Ev Guide Details fetched successfully!"],
+            data: vehicleDetails[0],
+            gallery_data: imgName,
+            gallery_id: imgId,
+            base_url: `${req.protocol}://${req.get('host')}/uploads/vehicle-image/`
         });
 
     } catch (error) {

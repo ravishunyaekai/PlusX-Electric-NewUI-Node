@@ -23,17 +23,16 @@ export const getChargingServiceSlotList = asyncHandler(async (req, resp) => {
     
     if(fSlotDate >=  moment().format('YYYY-MM-DD')){
         query += `, (SELECT COUNT(id) FROM charging_service AS cs WHERE DATE(cs.slot_date_time) = '${slot_date}' AND TIME(slot_date_time) = pick_drop_slot.start_time AND order_status NOT IN ("C") ) AS slot_booking_count`;
-    }
-    query += ` FROM pick_drop_slot WHERE status = ? AND slot_date = ? ORDER BY start_time ASC`; //, "PNR" "WC", 
+    } 
+    query += ` FROM pick_drop_slot WHERE status = ? AND slot_date = ? ORDER BY start_time ASC`;  // , "PNR" "WC", 
 
-    const [slot] = await db.execute(query, [1, fSlotDate]); 
+    const [slot] = await db.execute(query, [1, fSlotDate]);
 
     return resp.json({ 
         message : "Slot List fetch successfully!",  data: slot, status: 1, code: 200,
         alert2  : "The slots for your selected date are fully booked. Please choose another date to book our EV Pick Up & Drop Off for your EV."
     });
 });
-
 export const requestService = asyncHandler(async (req, resp) => {
     
     const { rider_id, name, country_code, contact_no, pickup_address, pickup_latitude, pickup_longitude, parking_number='', parking_floor='', vehicle_id, slot_date_time, slot_id, price = 0, order_status = 'PNR', device_name= '', coupon_code='', address_id } = mergeParam(req);
@@ -53,7 +52,6 @@ export const requestService = asyncHandler(async (req, resp) => {
     });
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
     
-    // const conn = await startTransaction();
     try {
         const riderAddress = await queryDB(`
             SELECT 
@@ -127,7 +125,7 @@ export const requestService = asyncHandler(async (req, resp) => {
         }
         const bookingLimit = slotLimitRows[0].booking_limit;
 
-        // 3. Double-check limit AFTER locking
+        // 3.  Double-check limit AFTER locking
         if (bookingCount >= bookingLimit) {
             return resp.json({ message : ["The slot you have selected is already booked. Please select another slot."], status: 0, code: 422, error: true });
         }
@@ -143,7 +141,6 @@ export const requestService = asyncHandler(async (req, resp) => {
         const requestId = 'CS' + String( insert.insertId ).padStart(4, '0');
         await updateRecord('charging_service', { request_id : requestId }, ['id'], [insert.insertId] );
 
-        // await commitTransaction(conn);
         return resp.json({
             message    : [ 'We have received your booking. Our team will get in touch with you soon!' ],
             status     : 1,
@@ -151,14 +148,13 @@ export const requestService = asyncHandler(async (req, resp) => {
             code       : 200,
         });
     } catch(err) {
-        // await rollbackTransaction(conn);
+       
         console.error("Transaction failed:", err);
         tryCatchErrorHandler(req.originalUrl, err, resp );
     } finally {
         // if (conn) conn.release();
     }
 });
-//end 
 
 export const listServices = asyncHandler(async (req, resp) => {
     const {rider_id, page_no, bookingStatus } = mergeParam(req);
@@ -171,14 +167,14 @@ export const listServices = asyncHandler(async (req, resp) => {
     let statusCondition = (bookingStatus == 'CM' ) ? `order_status IN (?, ?)` : `order_status IN (?)`; 
     let statusParams    = (bookingStatus == 'C' ) ? ['C'] : ['WC', 'DO'];
     statusParams        = (bookingStatus == 'S' ) ? ['CNF'] : statusParams;
-    const orderBy       = 'ORDER BY id ASC'; //(bookingStatus == 'CM' ) ? 'ORDER BY slot_date_time ASC' : 'ORDER BY id DESC';
-
-    const totalQuery = `SELECT COUNT(*) AS total FROM charging_service WHERE rider_id = ? AND ${statusCondition}`;
-    const [totalRows] = await db.execute(totalQuery, [rider_id, ...statusParams]);
-    const total = totalRows[0].total;
-    const totalPage = Math.max(Math.ceil(total / limit), 1);
     
-    const formatCols = ['slot_date_time', 'created_at'];
+    const orderBy     = 'ORDER BY id ASC';
+    const totalQuery  = `SELECT COUNT(*) AS total FROM charging_service WHERE rider_id = ? AND ${statusCondition}`;
+    const [totalRows] = await db.execute(totalQuery, [rider_id, ...statusParams]);
+    const total       = totalRows[0].total;
+    const totalPage   = Math.max(Math.ceil(total / limit), 1);
+    
+    const formatCols    = ['slot_date_time', 'created_at'];
     const servicesQuery = `SELECT request_id, name, country_code, contact_no, slot, ROUND(charging_service.price / 100, 2) AS price, pickup_address, order_status, ${formatDateTimeInQuery(formatCols)}, rescheduled_booking 
     FROM charging_service WHERE rider_id = ? AND ${statusCondition} ${orderBy} LIMIT ${parseInt(start)}, ${parseInt(limit)}
     `;
@@ -206,7 +202,7 @@ export const getServiceOrderDetail = asyncHandler(async (req, resp) => {
     const { isValid, errors } = validateFields(mergeParam(req), {rider_id: ["required"], service_id: ["required"]});
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
 
-    const formatCols = ['created_at', 'updated_at'];
+    const formatCols = ['created_at', 'updated_at']; // 'slot_date_time', 
     
     const order = await queryDB(`
         SELECT 
@@ -224,13 +220,8 @@ export const getServiceOrderDetail = asyncHandler(async (req, resp) => {
     if(order){
         order.invoice_url = '';
         order.slot = 'Schedule';
-        // if (order.order_status == 'WC') {
-        //     const invoiceId = order.request_id.replace('CS', 'INVCS');
-        //     order.invoice_url = `https://plusx.s3.ap-south-1.amazonaws.com/public/pick-drop-invoice/${invoiceId}-invoice.pdf`;
-        // }
     }
     order.slot_date_time = moment(order.slot_date_time ).format('YYYY-MM-DD HH:mm:ss');
-
     const order_status = history.filter(item => item.order_status === 'CNF');
     if(order_status.length > 1) {
 
@@ -276,14 +267,13 @@ export const getInvoiceList = asyncHandler(async (req, resp) => {
     });
 
     return resp.json({
-        status     : 1,
-        code       : 200,
-        message    : ["Pick & Drop Invoice List fetch successfully!"],
-        data       : result.data,
-        total_page : result.totalPage,
-        total      : result.total,
-        base_url   : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/pick-drop-invoice/`,  
-    }); ////https://plusx.s3.ap-south-1.amazonaws.com
+        status: 1,
+        code: 200,
+        message: ["Pick & Drop Invoice List fetch successfully!"],
+        data: result.data,
+        total_page: result.totalPage,
+        total: result.total,
+    });
 });
 export const getInvoiceDetail = asyncHandler(async (req, resp) => {
     const {rider_id, invoice_id } = mergeParam(req);
@@ -300,8 +290,6 @@ export const getInvoiceDetail = asyncHandler(async (req, resp) => {
         WHERE 
             csi.invoice_id = ?
     `, [invoice_id]);
-
-    invoice.invoice_url = `https://plusx.s3.ap-south-1.amazonaws.com/public/pick-drop-invoice/${invoice_id}-invoice.pdf`;
 
     return resp.json({
         message: ["Pick & Drop Invoice Details fetch successfully!"],
@@ -328,7 +316,7 @@ export const cancelValetBooking = asyncHandler(async (req, resp) => {
         LEFT JOIN 
             rsa ON rsa.rsa_id = cs.rsa_id 
         WHERE 
-            cs.request_id = ? AND cs.rider_id = ? AND order_status IN ('CNF', 'A', 'ER') 
+            cs.request_id = ? AND cs.rider_id = ? AND order_status IN ('CNF', 'A') 
         LIMIT 1
     `,[booking_id, rider_id]);
 
@@ -356,7 +344,7 @@ export const cancelValetBooking = asyncHandler(async (req, resp) => {
     
     const href    = `charging_service/${booking_id}`;
     const title   = 'EV Pick Up & Drop Off Booking!';
-    const message = `Booking Cancelled! (${booking_id})`;
+    const message = `Booking Cancelled: ${booking_id}`;
     await createNotification(title, message, 'Charging Service', 'Admin', 'Rider', rider_id, '', href);
 
     if( checkOrder.rsa_id) {
@@ -394,6 +382,7 @@ export const cancelValetBooking = asyncHandler(async (req, resp) => {
     return resp.json({ message: ['Booking has been cancelled successfully!'], status: 1, code: 200 });
 });
 
+
 export const userFeedbackValetBooking = asyncHandler(async (req, resp) => {
     const { rider_id, booking_id, description ='', rating } = mergeParam(req);
     const { isValid, errors } = validateFields(mergeParam(req), {
@@ -427,10 +416,12 @@ export const userFeedbackValetBooking = asyncHandler(async (req, resp) => {
             booking_id, rider_id, checkOrder.rsa_id, rating, description
         ]);
         if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
-
+        
         const href    = `charging_service/${booking_id}`;
-        const title   = 'EV Pick Up & Drop Off Feedback!';
-        const message = `Feedback Received - Booking ID: ${booking_id}.`;
+        // const title   = 'EV Pick Up & Drop Off Feedback!';
+        // const message = `Feedback Received - Booking ID: ${booking_id}.`;
+        const title   = `Feedback Received- ${booking_id}`;
+       const message = `You've received feedback from a customer`;
         await createNotification(title, message, 'Charging Service', 'Admin', 'Rider', rider_id, '', href);
 
         const adminHtml = `<html>
@@ -551,7 +542,7 @@ export const rescheduleService = asyncHandler(async (req, resp) => {
         
         const href    = 'charging_service/' + booking_id;
         const heading = 'EV Pick Up & Drop Off Booking!';
-        const desc    = `Rescheduled Booking Confirmed! (${booking_id})`;
+        const desc    = `Rescheduled Booking Confirmed! ${booking_id}`;
         createNotification(heading, desc, 'Charging Service', 'Rider', 'Admin', '', rider_id, href);
         createNotification(heading, desc, 'Charging Service', 'Admin', 'Rider', rider_id, '', href);
         pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
