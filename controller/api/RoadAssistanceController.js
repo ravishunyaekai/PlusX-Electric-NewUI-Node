@@ -139,7 +139,8 @@ export const roadAssistanceList = asyncHandler(async (req, resp) => {
             ${parseInt(start)}, ${parseInt(limit)}
     `;
     const [bookingList] = await db.execute(bookingsQuery, [rider_id, ...statusParams]);
-
+    let inProcessBookingList=[];
+    if(bookingStatus==="S"){
     const inProcessQuery = `
         SELECT 
             request_id, ROUND(road_assistance.price/100, 2) AS price, name, country_code, contact_no, order_status, ${formatDateTimeInQuery(['created_at'])}, pickup_address
@@ -151,8 +152,10 @@ export const roadAssistanceList = asyncHandler(async (req, resp) => {
             ${parseInt(start)}, ${parseInt(limit)}
     `;
     const inProcessParams        = ['CNF', 'C', 'PU', 'RO', 'PNR', 'CC'];
-    const [inProcessBookingList] = await db.execute(inProcessQuery, [rider_id, ...inProcessParams]);
-
+    const [inProcessrow] = await db.execute(inProcessQuery, [rider_id, ...inProcessParams]);
+    inProcessBookingList=inProcessrow;
+    
+    }
     return resp.json({
         status     : 1,
         code       : 200,

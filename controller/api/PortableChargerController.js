@@ -9,6 +9,7 @@ import db from "../../config/db.js";
 import { asyncHandler, createNotification, formatDateInQuery, formatDateTimeInQuery, mergeParam, pushNotification, checkCoupon } from "../../utils.js";
 dotenv.config();
 import { tryCatchErrorHandler } from "../../middleware/errorHandler.js";
+import e from "express";
 
 export const chargerList = asyncHandler(async (req, resp) => {
     const {rider_id, page_no } = mergeParam(req);
@@ -251,13 +252,18 @@ export const chargerBookingList = asyncHandler(async (req, resp) => {
         FROM portable_charger_booking WHERE rider_id = ? AND ${statusCondition} ${orderBy} LIMIT ${parseInt(start)}, ${parseInt(limit)}
     `;
     const [bookingList] = await db.execute(bookingsQuery, [rider_id, ...statusParams]);
+let inProcessBookingList=[];
+   if(bookingStatus==="S"){
 
+   
     const inProcessQuery = `SELECT rescheduled_booking, booking_id, service_name, ROUND(portable_charger_booking.service_price/100, 2) AS service_price, service_type, user_name, country_code, contact_no, slot_time, status, 
         ${formatDateTimeInQuery(['created_at'])}, ${formatDateInQuery(['slot_date'])}
         FROM portable_charger_booking WHERE rider_id = ? AND status NOT IN (?, ?, ?, ?, ?, ?) ${orderBy} LIMIT ${parseInt(start)}, ${parseInt(limit)}
     `;
     const inProcessParams        = ['CNF', 'C', 'PU', 'RO', 'PNR', 'CC'];
-    const [inProcessBookingList] = await db.execute(inProcessQuery, [rider_id, ...inProcessParams]);
+     const [inProcessrow] = await db.execute(inProcessQuery, [rider_id, ...inProcessParams]);
+     inProcessBookingList=inProcessrow;
+}
 
     return resp.json({
         message    : ["Portable Charger Booking List fetched successfully!"],

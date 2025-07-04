@@ -300,14 +300,25 @@ const chargingStart = async (req, resp) => {
 const chargingComplete = async (req, resp) => {
     const { booking_id, rsa_id, latitude, longitude } = mergeParam(req);
     // 
+    // const checkOrder = await queryDB(`
+    //     SELECT rider_id, 
+    //         (SELECT fcm_token FROM riders WHERE rider_id = order_assign.rider_id limit 1) AS fcm_token,
+    //         (SELECT pod_id FROM road_assistance as rsa WHERE rsa.request_id = order_assign.order_id limit 1) AS pod_id
+    //     FROM 
+    //         order_assign
+    //     WHERE 
+    //         order_id = ? AND rsa_id = ? AND status = 1
+    //     LIMIT 1
+    // `,[booking_id, rsa_id]);
+    
     const checkOrder = await queryDB(`
-        SELECT rider_id, 
-            (SELECT fcm_token FROM riders WHERE rider_id = order_assign.rider_id limit 1) AS fcm_token,
-            (SELECT pod_id FROM road_assistance as rsa WHERE rsa.request_id = order_assign.order_id limit 1) AS pod_id
-        FROM 
-            order_assign
-        WHERE 
-            order_id = ? AND rsa_id = ? AND status = 1
+        SELECT oa.rider_id, r.rider_name, r.rider_email,r.fcm_token,
+(SELECT pod_id FROM road_assistance as rsa WHERE rsa.request_id = oa.order_id limit 1) AS pod_id
+         FROM 
+		order_assign as oa
+			LEFT JOIN  riders as r on r.rider_id=oa.rider_id
+             WHERE 
+            oa.order_id= ? AND oa.rsa_id = ? AND oa.status = 1
         LIMIT 1
     `,[booking_id, rsa_id]);
 
@@ -340,6 +351,17 @@ const chargingComplete = async (req, resp) => {
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         await rsaInvoice(checkOrder.rider_id, booking_id); 
+        const html = `<html>
+                <body>
+                    <h4>Dear ${checkOrder.rider_name}</h4>
+                    <p>We hope you're doing well.</p>
+                    <p>Thank you for choosing PlusX Electric for your EV Roadside Assistance service. We're pleased to inform you that the service has been successfully completed.</p>
+                    <p>We truly appreciate your trust in us and look forward to serving you again.</p>
+                    <p>Best Regards,<br/>PlusX Electric Team </p>
+                </body>
+            </html>`;
+            
+            emailQueue.addEmail(checkOrder.rider_email, 'PlusX Electric: Your EV Roadside Assistance Service is Now Complete', html);  //, attachment
 
         return resp.json({ message: ['Vehicle Charging Completed successfully!'], status: 1, code: 200 });
     } else {
@@ -417,20 +439,20 @@ const chargerPickedUp = async (req, resp) => {
         //     return resp.json({ message: ['Failed to generate invoice. Please Try Again!'], status: 0, code: 200 });
         // }
         // if(pdf.success){
-            const html = `<html>
-                <body>
-                    <h4>Dear ${bookingData.data.rider_name}</h4>
-                    <p>We hope you're doing well.</p>
-                    <p>Thank you for choosing PlusX Electric for your EV Roadside Assistance service. We're pleased to inform you that the service has been successfully completed.</p>
-                    <p>We truly appreciate your trust in us and look forward to serving you again.</p>
-                    <p>Best Regards,<br/>PlusX Electric Team </p>
-                </body>
-            </html>`;
-            // , and the details of your invoice are attached
-            // const attachment = {
-            //     filename: `${invoiceId}-invoice.pdf`, path: pdf.pdfPath, contentType: 'application/pdf'
-            // };
-            emailQueue.addEmail(bookingData.data.rider_email, 'PlusX Electric: Your EV Roadside Assistance Service is Now Complete', html);  //, attachment
+            // const html = `<html>
+            //     <body>
+            //         <h4>Dear ${bookingData.data.rider_name}</h4>
+            //         <p>We hope you're doing well.</p>
+            //         <p>Thank you for choosing PlusX Electric for your EV Roadside Assistance service. We're pleased to inform you that the service has been successfully completed.</p>
+            //         <p>We truly appreciate your trust in us and look forward to serving you again.</p>
+            //         <p>Best Regards,<br/>PlusX Electric Team </p>
+            //     </body>
+            // </html>`;
+            // // , and the details of your invoice are attached
+            // // const attachment = {
+            // //     filename: `${invoiceId}-invoice.pdf`, path: pdf.pdfPath, contentType: 'application/pdf'
+            // // };
+            // emailQueue.addEmail(bookingData.data.rider_email, 'PlusX Electric: Your EV Roadside Assistance Service is Now Complete', html);  //, attachment
         // }
         
         return resp.json({ message: ['Charger picked-up successfully!'], status: 1, code: 200 });
