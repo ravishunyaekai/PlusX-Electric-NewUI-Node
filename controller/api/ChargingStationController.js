@@ -2,6 +2,9 @@ import db from "../../config/db.js";
 import { queryDB } from '../../dbUtils.js';
 import validateFields from "../../validation.js";
 
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { mergeParam, getOpenAndCloseTimings, asyncHandler, getSingleRoute, getMultipleRoute} from '../../utils.js';
 
 export const stationList = asyncHandler(async (req, resp) => {
@@ -53,7 +56,7 @@ export const stationList = asyncHandler(async (req, resp) => {
         total_page,
         status   : 1,
         code     : 200,
-        base_url : new URL('/uploads/charging-station-images/', req.protocol + '://' + req.get('host')).href
+        base_url : `${process.env.DIR_UPLOADS}charging-station-images/` //new URL('', req.protocol + '://' + req.get('host')).href
     }); 
 });
 
@@ -88,7 +91,7 @@ export const stationDetail = asyncHandler(async (req, resp) => {
     const origin       = `${latitude}, ${longitude}`;
     const destination  = `${station.latitude}, ${station.longitude}`;
     const distancedata = await getSingleRoute(origin, destination)
-    station.distance   = parseFloat(distancedata.distance );
+    station.distance   =  parseFloat(distancedata.distance);
 
     return resp.json({
         status       : 1,
@@ -96,7 +99,7 @@ export const stationDetail = asyncHandler(async (req, resp) => {
         message      : ["Charging Station Details fetched successfully!"],
         data         : station,
         gallery_data : imgName,
-        base_url     : new URL('/uploads/charging-station-images/', req.protocol + '://' + req.get('host')).href
+        base_url     : `${process.env.DIR_UPLOADS}charging-station-images/`
     });
 });
 

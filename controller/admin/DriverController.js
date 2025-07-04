@@ -35,7 +35,7 @@
                 // slot_data  : slotData,
                 total_page : result.totalPage,
                 total      : result.total,
-                base_url   : `${req.protocol}://${req.get('host')}/uploads/driver-images/`,
+                base_url   : `${process.env.DIR_UPLOADS}driver-images/`,
             });
         } catch (error) {
             console.error('Error fetching charger list:', error);

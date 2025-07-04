@@ -6,11 +6,12 @@ import ejs from 'ejs';
 import { insertRecord, queryDB } from "./dbUtils.js";
 import { GoogleAuth } from "google-auth-library";
 import { fileURLToPath } from 'url';
-import fs from 'fs';
+// import fs from 'fs';
 import dotenv from 'dotenv';
 import db from "./config/db.js";
 dotenv.config();
 import moment from "moment-timezone";
+import { deleteImageFromS3 } from "./fileUpload.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -83,28 +84,26 @@ export const delOTP = (key) => {
   return otpCache.del(key);
 };
 
-
 /* API Call to Send OTP */
 export const sendOtp = async (mobile, otpMsg) => {
-  const username = process.env.SMS_USERNAME;
-  const password = process.env.SMS_PASSWORD;
-  const from = "PlusX";
+    const username = process.env.SMS_USERNAME;
+    const password = process.env.SMS_PASSWORD;
+    const from = "PlusX";
 
-  const baseUrl = `https://api.smsglobal.com/http-api.php?action=sendsms&user=${username}&password=${password}&from=${encodeURIComponent(
-    from
-  )}&to=${mobile}&text=${encodeURIComponent(otpMsg)}`;
+    const baseUrl = `https://api.smsglobal.com/http-api.php?action=sendsms&user=${username}&password=${password}&from=${encodeURIComponent(
+        from
+    )}&to=${mobile}&text=${encodeURIComponent(otpMsg)}`;
 
-  try {
-    const response = await axios.get(baseUrl);
+    try {
+        const response = await axios.get(baseUrl);
 
-    if (response.data) {
-      return { status: 1, msg: response.data };
+        if (response.data) {
+        return { status: 1, msg: response.data };
+        }
+    } catch (err) {
+        return { status: 0, msg: err.message, code: err.status };
     }
-  } catch (err) {
-    return { status: 0, msg: err.message, code: err.status };
-  }
 };
-
 
 /* Format Timings */
 export const getOpenAndCloseTimings = (data) => {
@@ -395,14 +394,18 @@ export const formatDateInQuery = (columns) => {
 
 /* Helper to delete a image from uploads/ */
 export const deleteFile = (directory, filename) => {
-  const file_path = path.join('uploads', directory, filename);
-  if(file_path){
-    fs.unlink(file_path, (err) => {
-        if (err) console.error(`Failed to delete ${directory} image ${filename}:`, err);
-    });
-  }else{
-    console.log('File does not exist.');
-  }
+    // const file_path = path.join('uploads', directory, filename);
+    
+    const oldImagePath = path.join(process.env.S3_FOLDER_NAME, directory, filename || '').replace(/\\/g, '/');
+    deleteImageFromS3(oldImagePath);    
+
+    // if(file_path){
+    //     fs.unlink(file_path, (err) => {
+    //         if (err) console.error(`Failed to delete ${directory} image ${filename}:`, err);
+    //     });
+    // } else {
+    //     console.log('File does not exist.');
+    // }
 };
 
 export const asyncHandler = (fn) => {
@@ -417,7 +420,7 @@ export const generatePdf = async (templatePath, invoiceData, fileName, savePdfDi
   try {
     const html = await ejs.renderFile(templatePath, { ...invoiceData });
     // const serverUrl = `https://plusx.shunyaekai.com/web/upload-pdf`;
-    const serverUrl = `${req.protocol}://${req.get('host')}/web/upload-pdf`;       
+    const serverUrl = `https://plusx.s3.ap-south-1.amazonaws.com/web/upload-pdf`;       
 
     const response = await axios.post('http://supro.shunyaekai.tech:8801/pdf-api.php', {  //http://supro.shunyaekai.tech:8801/pdf-api.php
       html,
@@ -438,7 +441,7 @@ export const generatePdf = async (templatePath, invoiceData, fileName, savePdfDi
   }
 };
 
-export const checkCoupon = async (rider_id, booking_type, coupon_code) => {
+export const checkCoupon = async (rider_id, booking_type, coupon_code, bookingPrice=0) => {
     
     const [[{ count }]] = await db.execute('SELECT COUNT(*) AS count FROM coupon WHERE coupan_code = ?',[coupon_code]);
     if (count === 0) return { status: 0, code: 422, message : 'The coupon you entered is not valid.' };
@@ -463,20 +466,24 @@ export const checkCoupon = async (rider_id, booking_type, coupon_code) => {
     } else if(coupon.use_count >= coupon.user_per_user){
         return { status: 0, code: 422, message : "This coupon code has already been used the maximum number of times."} ;
     }
-    const priceQry  = `SELECT portable_price, pick_drop_price, roadside_assistance_price, portable_price, pick_drop_price FROM booking_price LIMIT 1`;
-    const priceData = await queryDB(priceQry, []);
+    var amount;
+    if( bookingPrice ) {
+        amount = bookingPrice;
 
-    const amount = (booking_type == 'Valet Charging') ? priceData.pick_drop_price : (booking_type == 'Roadside Assistance') ? priceData.roadside_assistance_price : priceData.portable_price ;
-    
-
+    } else {
+        const priceQry = `SELECT portable_price, pick_drop_price, roadside_assistance_price, portable_price, pick_drop_price FROM booking_price LIMIT 1`;
+        const priceData = await queryDB(priceQry, []);
+        amount = (booking_type == 'Valet Charging') ? priceData.pick_drop_price : priceData.portable_price ;
+    }
     const data = {}; 
+    
     if ( coupon.coupan_percentage != parseFloat(100) ) {
         const dis_price = ( amount  * coupon.coupan_percentage ) /100;
         const total_amt = amount - dis_price;
         
         const vat_amt  = Math.floor(( total_amt ) * 5) / 100;
         data.total_amt = total_amt + vat_amt;
-
+        
     } else {
         const vat_amt  = Math.floor(( amount ) * 5) / 100;
         const total_amt = parseFloat(amount) + parseFloat( vat_amt ); 
@@ -494,7 +501,6 @@ export const checkCoupon = async (rider_id, booking_type, coupon_code) => {
         code          : 200
     };
 };
-
 
 // Get Route Map Single or Multiple
 export const getSingleRoute = async (origin, destination) => {
@@ -536,7 +542,7 @@ export const getMultipleRoute = async (origin, destinations) => {
     const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origin}&destinations=${destStr}&key=${apiKey}`;
     const res = await axios.get(url);
 
-    res.data.rows[0].elements.forEach((element, index) => {
+    res.data.rows[0]?.elements.forEach((element, index) => {
 
         if (element.status === 'OK') {
             destinations[index].distance = parseFloat(element.distance.text);
@@ -545,15 +551,47 @@ export const getMultipleRoute = async (origin, destinations) => {
     });
     return destinations;
 }
-
 export const  ResponseData=(resp,status, code, message, data = {})=> {
-  if (typeof message === 'string') {
-    message = [message];
-  }
-  return resp.json({
-    status,
-    code,
-    message,
-    ...data
-  });
+    if (typeof message === 'string') {
+        message = [message];
+    }
+    return resp.json({
+        status,
+        code,
+        message,
+        ...data
+    });
 }
+
+const notificationData = async (module_name, sub_module, response_type, content_id) => {
+    let fields = ['content'];
+
+    if (response_type === 'notification') {
+        fields.push('heading');
+    }
+
+    // Join fields to build SELECT query
+    const query = `
+        SELECT ${fields.join(', ')}
+        FROM response_content
+        WHERE module_name = ? AND sub_module = ? AND content_id = ? AND status = 1
+    `;
+
+    const result = await db.query(query, [module_name, sub_module, content_id]);
+
+    if (!result || result.length === 0) return null;
+
+    const row = result[0];
+    let data = {};
+
+    if (response_type === 'alert') {
+        data.content = row.content;
+    } else if (response_type === 'notification') {
+        data = {
+            heading: row.heading,
+            content: row.content
+        };
+    }
+
+    return data;
+};

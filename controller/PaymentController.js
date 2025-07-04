@@ -46,7 +46,7 @@ export const createIntent = async (req, resp) => {
                     country     : "United Arab Emirates",
                 },
                 email       : rider_email,
-                description : `This booking Id : ${booking_id} for POD Booking.`
+                // description : `This booking Id : ${booking_id} for POD Booking.`
             });
             customerId = customer.id;
         }
@@ -55,7 +55,7 @@ export const createIntent = async (req, resp) => {
             { customer  : customerId },
             {apiVersion : '2024-04-10'}
         );
-
+        const bookingDesc   = await sendDescBooking(booking_type, booking_id);
         const paymentIntent = await stripe.paymentIntents.create({
             amount                    : amount < 200 ? 200 : Math.floor(amount),
             currency                  : currency,
@@ -71,10 +71,12 @@ export const createIntent = async (req, resp) => {
                     request_three_d_secure : 'any',
                 },
             },
+            description: bookingDesc,
             metadata : {
                 booking_type : booking_type,
                 booking_id   : booking_id,
                 user_id      : rider_id,
+                coupon_code  : coupon_code,
             },
         });
         const returnData = {
@@ -84,14 +86,7 @@ export const createIntent = async (req, resp) => {
             customer            : customerId,
             publishableKey      : process.env.STRIPE_PUBLISER_KEY,
         };
-        if(coupon_code){
-            const coupon = await queryDB(`SELECT coupan_percentage FROM coupon WHERE coupan_code = ? LIMIT 1 `, [ coupon_code ]); 
-    
-            let coupan_percentage = coupon.coupan_percentage ;
-            await insertRecord('coupon_usage', ['coupan_code', 'user_id', 'booking_id', 'coupan_percentage'], [coupon_code, rider_id, booking_id, coupan_percentage]);
-        }
-
-        await updateBoking( booking_type, booking_id, rider_id, paymentIntent.id ); 
+        // await updateBoking( booking_type, booking_id, rider_id, paymentIntent.id ); 
         return resp.json({
             message : ["Payment Intent Created successfully!"],
             data    : returnData,
@@ -262,7 +257,6 @@ export const autoPay = async (req, resp) => {
         tryCatchErrorHandler(err, resp);
     }
 };
-
 export const redeemCoupon = async (req, resp) => {
     const {rider_id, amount, booking_type, coupon_code } = mergeParam(req);
     
@@ -300,11 +294,11 @@ export const redeemCoupon = async (req, resp) => {
         const total_amt = amount - dis_price;
         
         data.dis_price  = dis_price;
-        data.t_vat_amt  = Math.round(( total_amt ) * 5) / 100;
+        data.t_vat_amt  = Math.floor(( total_amt ) * 5) / 100;
         data.total_amt  = total_amt + data.t_vat_amt;
 
     } else {
-        data.t_vat_amt  = Math.round(( amount ) * 5) / 100;
+        data.t_vat_amt  = Math.floor(( amount ) * 5) / 100;
         const total_amt  = parseFloat(amount) + parseFloat( data.t_vat_amt ); 
 
         const dis_price = ( total_amt * coupon.coupan_percentage)/100;
@@ -326,6 +320,56 @@ export const redeemCoupon = async (req, resp) => {
         message           : ['Your discount has been successfully applied. Enjoy the savings!'],
         status            : 1,
         code              : 200
+    });
+};
+export const redeemCouponOld = async (req, resp) => {
+    const {rider_id, amount, booking_type, coupon_code } = mergeParam(req);
+    
+    const { isValid, errors } = validateFields(mergeParam(req), {
+        rider_id     : ["required"], 
+        amount       : ["required"],
+        booking_type : ["required"],
+        coupon_code  : ["required"],
+    });
+    if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
+    const [[{ count }]] = await db.execute('SELECT COUNT(*) AS count FROM coupon WHERE coupan_code = ?',[coupon_code]);
+    if (count === 0) return resp.json({ status: 0, code: 422, message: ['The coupon code you entered does not exist in our records.'] });
+
+    const coupon = await queryDB(`
+        SELECT
+            coupan_percentage, end_date, user_per_user, status, booking_for, 
+            (SELECT count(id) FROM coupon_usage AS cu WHERE cu.coupan_code = coupon.coupan_code AND user_id = ?) as use_count
+        FROM coupon
+        WHERE coupan_code = ?
+        LIMIT 1
+    `, [rider_id, coupon_code]); 
+
+    if (moment(coupon.end_date).isBefore(moment(), 'day') || coupon.status < 1){
+        return resp.json({ errors: {coupon_code: ["Coupon is invalid or expired."]} });
+
+    } else if(coupon.booking_for != booking_type){
+        return resp.json({ errors: {booking_type: ["Coupon code is invalid for this booking type."]} });
+
+    } else if(coupon.use_count >= coupon.user_per_user){
+        return resp.json({ errors: {coupon_code: ["Coupon per user limit exceeded."]} });
+    }
+    // const t_vat_amt   = ( coupon.coupan_percentage == parseFloat(100) ) ? 0 : Math.floor(( amount ) * 5) / 100; 
+    const t_vat_amt   = Math.floor(( amount ) * 5) / 100; 
+    const totalAmount = parseFloat(amount) + parseFloat( t_vat_amt );  
+    
+    const disAmount   = (totalAmount * coupon.coupan_percentage)/100;
+    const finalAmount = totalAmount - disAmount;
+
+    return resp.json({
+        bookingAmount : formatNumber(amount),
+        vat_amt       : formatNumber(t_vat_amt),
+        totalAmount   : formatNumber(totalAmount),
+        discount      : formatNumber(disAmount),
+        data          : formatNumber(finalAmount),  //formatNumber(finalAmount),
+        coupan_percentage : coupon.coupan_percentage,
+        message       : [],
+        status        : 1,
+        code          : 200
     });
 };
 
@@ -581,17 +625,18 @@ export const getPaymentSession = async (req, resp) => {
                     country     : "United Arab Emirates",
                 },
                 email       : rider_email,
-                description : `This booking Id : ${booking_id} for POD Booking.`
+                // description : `This booking Id : ${booking_id} for POD Booking.`
             });
             customerId = customer.id;
         }
+        const bookingDesc = await sendDescBooking(booking_type, booking_id);
         const session = await stripe.checkout.sessions.create({
             payment_method_types : ["card"],
             line_items : [
                 {
                     price_data : {
                         currency     : currency,
-                        product_data : { name : `This booking Id : ${booking_id} for POD Booking.` },
+                        product_data : { name : bookingDesc },
                         unit_amount  : amount < 200 ? 200 : Math.floor(amount), // $50.00
                     },
                     quantity : 1,
@@ -605,6 +650,13 @@ export const getPaymentSession = async (req, resp) => {
             customer            : customerId, // Existing customer ID
             payment_intent_data : {
                 setup_future_usage : "on_session", // Forces 3D Secure authentication   off_session
+                metadata : {
+                    booking_type : booking_type,
+                    booking_id   : booking_id,
+                    user_id      : rider_id,
+                    coupon_code  : coupon_code,
+                },
+                description: bookingDesc,
             },
             saved_payment_method_options : {
                 payment_method_save :  "enabled"
@@ -617,15 +669,10 @@ export const getPaymentSession = async (req, resp) => {
                 booking_type : booking_type,
                 booking_id   : booking_id,
                 user_id      : rider_id,
-            },
+                coupon_code  : coupon_code,
+            }
         });
-        if(coupon_code) { 
-            const coupon = await queryDB(`SELECT coupan_percentage FROM coupon WHERE coupan_code = ? LIMIT 1 `, [ coupon_code ]); 
-    
-            let coupan_percentage = coupon.coupan_percentage ;
-            await insertRecord('coupon_usage', ['coupan_code', 'user_id', 'booking_id', 'coupan_percentage'], [coupon_code, rider_id, booking_id, coupan_percentage]);
-        }
-        await updateBoking( booking_type, booking_id, rider_id, session.id ); 
+        // await updateBoking( booking_type, booking_id, rider_id, session.id ); 
         return resp.json({ 
             message    : ['Paymnet session'], 
             status     : 1, 
@@ -711,6 +758,24 @@ const updateBoking = async (booking_type, booking_id, rider_id, payment_intent_i
         case 'RSA':
             await updateRecord('road_assistance', {payment_intent_id}, ['request_id', 'rider_id'], whereArr );
             break;
+        default:
+            console.log('Unknown booking type');
+            break;
+    }
+    return true;
+};
+const sendDescBooking = async (booking_type, booking_id,  ) => {
+    
+    switch (booking_type) {
+        case 'PCB':
+            return `POD Booking - ${booking_id}`;
+
+        case 'CS':
+            return `Pickup & Dropoff Booking - ${booking_id}`;
+
+        case 'RSA':
+            return `Roadside Assistance Service - ${booking_id}`;
+
         default:
             console.log('Unknown booking type');
             break;

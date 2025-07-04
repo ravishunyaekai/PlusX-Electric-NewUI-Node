@@ -314,7 +314,7 @@ export const boardDelete = asyncHandler(async (req, resp) => {
             error: false,
             message: ["Discussion Board deleted successfully!"]
         });
-    } catch(err){
+    }catch(err){
         await rollbackTransaction(connection);
         console.error('Error deleting board:', err);
         return resp.json({ status: 0, code: 500, error: true, message: ["An unexpected error occurred. Please try again."] });

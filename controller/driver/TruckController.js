@@ -48,7 +48,7 @@ export const truckFuelAction = asyncHandler(async (req, resp) => {
             status  : 1, 
             code    : 200, 
             message : ["Fuel data added successfully"],
-            // image_url: `${req.protocol}://${req.get('host')}/uploads/truck-images/${profile_image}`
+            // image_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/truck-images/${profile_image}`
         });
 
     } catch(err) {

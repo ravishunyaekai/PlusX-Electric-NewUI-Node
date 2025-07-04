@@ -74,11 +74,11 @@ export const rsaBookingStage = asyncHandler(async (req, resp) => {
     return resp.json({
         status: 1,
         code: 200,
-        message: ["Booking stage fetch successfully."],
-        booking_status: booking.status,
-        execution_time: humanReadableDuration,
-        booking_history: bookingTracking,
-        image_path: `${req.protocol}://${req.get('host')}/uploads/portable-charger/`
+        message         : ["Booking stage fetch successfully."],
+        booking_status  : booking.status,
+        execution_time  : humanReadableDuration,
+        booking_history : bookingTracking,
+        image_path      : `${process.env.DIR_UPLOADS}portable-charger/`
     });
     
 });
@@ -182,10 +182,10 @@ const acceptBooking = async (req, resp) => {
         await updateRecord('portable_charger_booking', {status: 'A', rsa_id}, ['booking_id'], [booking_id]);
 
         const href    = `portable_charger_booking/${booking_id}`;
-        const title   = 'POD Booking Accepted';
-        const message = `Booking Accepted! ID: ${booking_id}.`;
+        const title   = 'Portable Charging Booking!';
+        const message = `Booking Accepted! ${booking_id}`;
         await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
-        await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
+      //  await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         await db.execute('UPDATE portable_charger_booking_assign SET status = 1 WHERE order_id = ? AND rsa_id = ?', [booking_id, rsa_id]);
@@ -233,10 +233,10 @@ const driverEnroute = async (req, resp) => {
         await updateRecord('portable_charger_booking', {status: 'ER'}, ['booking_id' ], [booking_id ]);
 
         const href    = `portable_charger_booking/${booking_id}`;
-        const title   = 'PlusX Electric team is on the way!';
-        const message = `Please have your EV ready for charging.`;
+        const title   = 'Portable Charging Booking!';
+        const message = `PlusX Electric team is on the way!`;
         await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
-        await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
+        //await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         return resp.json({ message : ['PlusX Electric team is on the way!  Please have your EV ready for charging.'], status: 1, code: 200 });
@@ -273,10 +273,10 @@ const reachedLocation = async (req, resp) => {
         await updateRecord('portable_charger_booking', {status: 'RL', rsa_id}, ['booking_id'], [booking_id] );
 
         const href    = `portable_charger_booking/${booking_id}`;
-        const title   = 'POD Reached at Location';
+        const title   = 'Portable Charging Booking!';
         const message = `The POD has arrived. Please unlock your EV.`;
-        await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
-        await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
+         await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
+        // await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
         return resp.json({ message: ['The Portable Power Pod has arrived. Please unlock your EV.'], status: 1, code: 200 });
@@ -323,25 +323,11 @@ const chargingStart = async (req, resp) => {
         await updateRecord('pod_devices', { charging_status : 1, latitude, longitude}, ['pod_id'], [pod_id] );
 
         const href    = `portable_charger_booking/${booking_id}`;
-        const title   = 'EV Charging Start';
-        const message = `POD has started charging your EV!`;
+        const title   = 'Portable Charging Booking!';
+        const message = `The POD has started charging your EV!`;
         await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
-        await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
+        // await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
-         const bookingData = await getTotalAmountFromService(booking_id, 'PCB');
-        const html = `<html>
-                <body>
-                    <h4>Dear ${bookingData.data.rider_name}</h4>
-                    <p>Thank you for choosing PlusX Electric for your Portable EV Charger service. We’re pleased to inform you that the service has been successfully completed.</p>
-                    <p>We truly appreciate your trust in us and look forward to serving you again in the future.</p>
-                    <p>Best Regards,<br/>PlusX Electric Team </p>
-                </body>
-            </html>`;
-            // , and the details of your invoice are attached
-            // const attachment = {
-            //     filename: `${invoiceId}-invoice.pdf`, path: pdf.pdfPath, contentType: 'application/pdf'
-            // };        
-        emailQueue.addEmail(bookingData.data.rider_email, 'PlusX Electric: Your Portable EV Charger Service is Now Complete', html);  //, attachment
 
         return resp.json({ message: ['Charging has started. The Pod is now powering your EV!'], status: 1, code: 200 });
     } else {
@@ -350,16 +336,26 @@ const chargingStart = async (req, resp) => {
 };
 const chargingComplete = async (req, resp) => {
     const { booking_id, rsa_id, latitude, longitude } = mergeParam(req);
-    // 
+    
+    // const checkOrder = await queryDB(`
+    //     SELECT rider_id, 
+    //         (SELECT fcm_token FROM riders WHERE rider_id = portable_charger_booking_assign.rider_id limit 1) AS fcm_token,
+    //         (SELECT pod_id FROM portable_charger_booking as pcb WHERE pcb.booking_id = portable_charger_booking_assign.order_id limit 1) AS pod_id
+    //     FROM 
+    //         portable_charger_booking_assign
+    //     WHERE 
+    //         order_id = ? AND rsa_id = ? AND status = 1
+    //     LIMIT 1
+    // `,[booking_id, rsa_id]);
     const checkOrder = await queryDB(`
-        SELECT rider_id, 
-            (SELECT fcm_token FROM riders WHERE rider_id = portable_charger_booking_assign.rider_id limit 1) AS fcm_token,
-            (SELECT pod_id FROM portable_charger_booking as pcb WHERE pcb.booking_id = portable_charger_booking_assign.order_id limit 1) AS pod_id
-        FROM 
-            portable_charger_booking_assign
-        WHERE 
-            order_id = ? AND rsa_id = ? AND status = 1
-        LIMIT 1
+        SELECT 
+    pcba.rider_id, r.rider_name, r.rider_email,r.fcm_token,
+    (SELECT pcb.pod_id FROM portable_charger_booking AS pcb WHERE pcb.booking_id = pcba.order_id LIMIT 1) AS pod_id
+FROM 
+portable_charger_booking_assign AS pcba
+LEFT JOIN  riders AS r ON r.rider_id = pcba.rider_id
+    WHERE pcba.order_id = ? AND pcba.rsa_id = ? AND pcba.status = 1
+LIMIT 1
     `,[booking_id, rsa_id]);
 
     if (!checkOrder) {
@@ -384,14 +380,25 @@ const chargingComplete = async (req, resp) => {
         await updateRecord('pod_devices', { charging_status : 0 }, ['pod_id'], [checkOrder.pod_id] );
 
         const href    = `portable_charger_booking/${booking_id}`;
-        const title   = 'Charging Completed!';
-        const message = `Charging complete, please lock your EV.`;
+        const title   = 'Portable Charging Booking!';
+        const message = `Charging complete. Please lock your EV.`;
+
         await createNotification(title, message, 'Portable Charging Booking', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
-        await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
+        // await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'RSA', rsa_id, '', href);
        
         await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);
 
-        return resp.json({ message: ['Charging complete. Don’t forget to lock your EV.'], status: 1, code: 200 });
+        const html = `<html>
+            <body>
+                <h4>Dear ${checkOrder.rider_name}</h4>
+                <p>Thank you for choosing PlusX Electric for your Portable EV Charger service. We're pleased to inform you that the service has been successfully completed.</p>
+                <p>We truly appreciate your trust in us and look forward to serving you again in the future.</p>
+                <p>Best Regards,<br/>PlusX Electric Team </p>
+            </body>
+        </html>`;
+        emailQueue.addEmail(checkOrder.rider_email, 'PlusX Electric: Your Portable EV Charger Service is Now Complete', html); 
+
+        return resp.json({ message: [`Charging complete. Don't forget to lock your EV.`], status: 1, code: 200 });
     } else {
         return resp.json({ message: ['Sorry this is a duplicate entry!'], status: 0, code: 200 });
     }

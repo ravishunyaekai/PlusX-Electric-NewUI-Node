@@ -56,7 +56,7 @@ export const stationList = asyncHandler(async (req, resp) => {
             data: result.data,
             total_page: result.totalPage,
             total: result.total,
-            base_url: `${req.protocol}://${req.get('host')}/uploads/charging-station-images/`
+            base_url: `${process.env.DIR_UPLOADS}charging-station-images/`
         });
 
     } catch (error) {
@@ -127,7 +127,7 @@ export const stationDetail = asyncHandler(async (req, resp) => {
         gallery_data : imgName,
         gallery_id   : imgId,
         result,
-        base_url : `${req.protocol}://${req.get('host')}/uploads/charging-station-images/`
+        base_url : `${process.env.DIR_UPLOADS}charging-station-images/`
     });
 });
 

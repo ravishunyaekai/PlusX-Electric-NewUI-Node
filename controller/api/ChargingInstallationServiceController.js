@@ -52,9 +52,9 @@ export const serviceRequest = asyncHandler(async (req, resp) => {
             <body>
                 <h4>Dear ${name},</h4>
                 <p>Thank you for booking our Charger Installation service. We are pleased to confirm that we have successfully received your booking.</p>
-                <p>Booking Details:</p>
-                Service: EV Charger Installation<br>
-                Booking ID: ${requestId}
+                <p>Booking Details : </p>
+                <p>Service    : EV Charger Installation</p>
+                <p>Booking ID : ${requestId}</p>
                 <p>Our team will get in touch with you shortly to coordinate the installation and ensure a smooth experience.</p>
                 <p>If you have any questions or need assistance, feel free to reach out to us. We're here to help!</p>
                 <p>Thank you for choosing PlusX Electric. We look forward to serving you soon.</p>
@@ -66,14 +66,15 @@ export const serviceRequest = asyncHandler(async (req, resp) => {
         const htmlAdmin = `<html>
             <body>
                 <h4>Dear Admin,</h4>
-                <p>We have received a new booking for our Charging Installation service. Below are the details:</p> <br/>
+                <p>We have received a new booking for our Charging Installation service. Below are the details:</p>
                 <p>Customer Name  : ${name}</p>
                 <p>Address : ${address}</p>
                 <p>Booking Time   : ${formattedDateTime}</p> <br/>                        
-                <p> Best regards,<br/>PlusX Electric Team </p>
+                <p>Best regards,<br/>PlusX Electric Team </p>
             </body>
         </html>`;
-        emailQueue.addEmail(process.env.MAIL_ADMIN, `Charging Installation Booking - ${requestId}`, htmlAdmin);
+        const adminEmails = [process.env.MAIL_ADMIN, process.env.MAIL_CHINTAN, process.env.MAIL_NADIA];
+        emailQueue.addEmail(adminEmails, `Charging Installation Booking - ${requestId}`, htmlAdmin);
 
         return resp.json({
             status  : 1, 
@@ -98,11 +99,12 @@ export const requestList = asyncHandler(async (req, resp) => {
             order_status,  ${formatDateTimeInQuery(['created_at'])}`,
         sortColumn: 'id',
         sortOrder: 'DESC',
-        page_no, 
+        page_no,
         limit: 10,
         whereField: ['rider_id'],
         whereValue: [rider_id]
     });
+
     return resp.json({
         status: 1,
         code: 200,
@@ -124,11 +126,7 @@ export const requestDetails = asyncHandler(async (req, resp) => {
     `, [request_id]);
 
     orderData[0].invoice_url = '';
-    if (orderData[0].order_status == 'ES') {
-        const invoice_id = orderData[0].request_id.replace('CS', 'INVCS');
-        orderData[0].invoice_url = `${req.protocol}://${req.get('host')}/public/charger-installation-invoice/${invoice_id}-invoice.pdf`;
-    }
-
+    
     const [history] = await db.execute(`
         SELECT *, ${formatDateTimeInQuery(['created_at', 'updated_at'])} FROM charging_installation_service_history WHERE service_id = ?
     `, [request_id]);

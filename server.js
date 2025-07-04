@@ -14,16 +14,50 @@ dotenv.config();
 
 import cron from 'node-cron';
 import { failedPODBooking, failedValetBooking, failedRSABooking } from './controller/TestController.js';
-
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 const app  = express();
 const PORT = process.env.PORT || 3435;
+
+/*
+//  socket start
+const httpServer = createServer(app); // wrap express with native http server
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*", // allow frontend to connect
+    methods: ["GET", "POST"]
+  }
+});
+
+io.on('connection', (socket) => {
+  console.log(' Socket connected:', socket.id);
+
+  // When notification needs to be sent (example event name)
+  socket.on('send-notification', (data) => {
+    console.log('📨 Notification received:', data);
+
+    // Broadcast to all clients
+    io.emit('receive-notification', data);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Socket disconnected:', socket.id);
+  });
+});
+
+httpServer.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
+
+// socket end
+*/
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
 const corsOptions = {
     origin : [
-        'http://100.98.63.95:2424',
+        'http://192.168.1.50:2424/',
         'http://192.168.43.223:1112',
         'http://192.168.43.223:3434',
         'http://localhost:1112',
@@ -31,6 +65,7 @@ const corsOptions = {
         'https://plusxmail.shunyaekai.com/',
         'http://supro.shunyaekai.tech:8801/',
         'http://localhost:1113',
+        'http://localhost:3000',
         'https://plusx.shunyaekai.com/'
     ],
     // origin : "*",

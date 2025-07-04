@@ -6,6 +6,9 @@ import generateUniqueId from 'generate-unique-id';
 import { asyncHandler, deleteFile, mergeParam } from '../../utils.js';
 import { queryDB, getPaginatedData, insertRecord, updateRecord } from '../../dbUtils.js';
 
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { tryCatchErrorHandler } from "../../middleware/errorHandler.js";
 
 export const vehicleList = asyncHandler(async (req, resp) => {
@@ -27,13 +30,13 @@ export const vehicleList = asyncHandler(async (req, resp) => {
     });
 
     return resp.json({
-        status: 1,
-        code: 200,
-        message: ["Vehicle List fetched successfully!"],
-        data: result.data,
-        total_page: result.totalPage,
-        total: result.total,
-        base_url: `${req.protocol}://${req.get('host')}/uploads/vehicle-image/`
+        status     : 1,
+        code       : 200,
+        message    : ["Vehicle List fetched successfully!"],
+        data       : result.data,
+        total_page : result.totalPage,
+        total      : result.total,
+        base_url   : `${process.env.DIR_UPLOADS}vehicle-image/`
     });
 });
 
@@ -53,7 +56,7 @@ export const vehicleDetail = asyncHandler(async (req, resp) => {
         message: ["Charging Station Details fetched successfully!"],
         data: vehicleData,
         gallery_data: imgName,
-        base_url: `${req.protocol}://${req.get('host')}/uploads/vehicle-image/`,
+        base_url: `${process.env.DIR_UPLOADS}vehicle-image/`,
     });
 
 });
@@ -182,7 +185,7 @@ export const allSellVehicleList = asyncHandler(async (req, resp) => {
         total_page: result.totalPage,
         status: 1,
         code: 200,
-        image_path: `${req.protocol}://${req.get('host')}/uploads/vehicle-image/`
+        image_path: `${process.env.DIR_UPLOADS}vehicle-image/`
     });
 
 });
@@ -213,7 +216,7 @@ export const sellVehicleList = asyncHandler(async (req, resp) => {
         total_page: result.totalPage,
         status: 1,
         code: 200,
-        image_path: `${req.protocol}://${req.get('host')}/uploads/vehicle-image/`
+        image_path: `${process.env.DIR_UPLOADS}vehicle-image/`
     });
 
 });
@@ -243,11 +246,11 @@ export const sellVehicleDetail = asyncHandler(async (req, resp) => {
     `,[sell_id]);
     
     return resp.json({
-        status: 1,
-        code: 200,
-        message: ["Charging Station Details fetched successfully!"],
-        sale_data: data,
-        image_path: `${req.protocol}://${req.get('host')}/uploads/vehicle-image/`,
+        status     : 1,
+        code       : 200,
+        message    : ["Charging Station Details fetched successfully!"],
+        sale_data  : data,
+        image_path : `${process.env.DIR_UPLOADS}vehicle-image/`,
     });
 
 });
@@ -482,48 +485,41 @@ export const vehicleBrandList = asyncHandler(async (req, resp) => {
 });
 
 export const dubaiAreaList = asyncHandler(async (req, resp) => {
-  const { area_name = "", page=1,} = mergeParam(req);
-const pageSize = 20;
+    const { area_name = "", page = 1 } = mergeParam(req);
+    const pageSize = 20;
 
-const [countRows] = await db.execute(`
-      SELECT COUNT(id) AS total_count
-      FROM dubai_area
-      WHERE status = '1'
+    const [countRows] = await db.execute(`
+        SELECT 
+            COUNT(id) AS total_count
+        FROM 
+            dubai_area
+        WHERE 
+            status = '1'
     `);
-    const totalCount = countRows[0].total_count;
+    const totalCount  = countRows[0].total_count;
+    const total_pages = Math.ceil(totalCount / pageSize);
 
-    const    total_pages = Math.ceil(totalCount / pageSize);
-
- let query ="SELECT area_name as area ,id from dubai_area where status='1'";
- let queryParams=[];
+    let query       = "SELECT area_name as area ,id from dubai_area where status='1'";
+    let queryParams = [];
  
-if(area_name!='')
-{
-query +=' AND area_name like ?'
-queryParams.push(`%${area_name}%`);
-}
+    if( area_name !='' ) {
+        query +=' AND area_name like ?'
+        queryParams.push(`%${area_name}%`);
+    }
+    query +=' ORDER BY area_name ASC';
 
-query +=' ORDER BY area_name ASC';
+    if( area_name == '' && page != '' ) {  
+        const offset = (page - 1) * pageSize;
+        query +=` LIMIT ${offset}, ${pageSize}`;
+    }
+    const [dataResult] = await db.execute(query, queryParams);
 
-if(area_name=='' && page!='')
- {  
-     const offset = (page - 1) * pageSize;
-    query +=` LIMIT ${offset}, ${pageSize}`;
-
-
-    
-
-
-}
-const [dataResult] = await db.execute(query, queryParams);
-
-  return resp.json({
-    status: 1,
-    code: 200,
-    message: ["Dubai Area List fetched successfully!"],
-     total_pages:total_pages,
-    current_page:page,
-    data: dataResult
-   
-  });
+    return resp.json({
+        status       : 1,
+        code         : 200,
+        message      : ["Dubai Area List fetched successfully!"],
+        total_pages  : total_pages,
+        current_page : page,
+        data         : dataResult
+    });
 });

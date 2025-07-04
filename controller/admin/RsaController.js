@@ -9,6 +9,7 @@ import fs from 'fs';
 import bcrypt from "bcryptjs";
 import moment from 'moment';
 
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -207,6 +208,23 @@ export const rsaAdd = asyncHandler(async (req, resp) => {
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
     if(password.length < 6) return resp.json({status:1, code: 422, message:["Password must be 6 digit"]});
     if(password != confirm_password) return resp.json({ status: 0, code: 422, message: ['Password and confirm password not matched!'] });
+    const mobileCheck = await db.query(`
+        SELECT 
+            rsa_id 
+        FROM 
+            rsa 
+        WHERE 
+            mobile = ? 
+        UNION ALL 
+            SELECT 
+                rider_id 
+            FROM 
+                riders 
+            WHERE 
+                rider_mobile = ?`, 
+    [mobile, mobile] );
+   
+    if (mobileCheck.length > 0) return resp.json({status:1, code: 200, message:["Mobile number already exists"]});
 
     let profile_image = req.files['profile_image'] ? req.files['profile_image'][0].filename  : '';
     const hashedPswd = await bcrypt.hash(password, 10);
