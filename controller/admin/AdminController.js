@@ -8,6 +8,7 @@ import moment from 'moment';
 // import { fileURLToPath } from 'url';
 // import fs from 'fs';
 dotenv.config();
+import { io } from '../../server.js';
 
 export const getDashboardData = async (req, resp) => {
     try {
@@ -82,6 +83,7 @@ export const getDashboardData = async (req, resp) => {
             // { module: 'Total Register your Interest', count: counts[0].total_pod }
         ];
         // return resp.json({code: 200, data:count_arr});
+        io.emit('notification-list', {msCount : 1});
         return resp.json({code : 200, data : {count_arr, location, podLocation}});
     } catch (error) {
         console.error('Error fetching dashboard data:', error);

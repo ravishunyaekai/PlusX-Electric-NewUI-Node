@@ -305,11 +305,11 @@ export const rsaAssignBooking = async (req, resp) => {
        
         const href    = 'road_assistance/' + booking_id;
         const heading = 'EV Roadside Assistance';
-        const desc    = `Booking Assigned: (${booking_id})`;
+        const desc    = `Booking Assigned : ${booking_id}`;
         //createNotification(heading, desc, 'Roadside Assistance', 'Rider', 'Admin', '', booking_data.rider_id, href);
-            //pushNotification(booking_data.fcm_token, heading, desc, 'RDRFCM', href);
+        //pushNotification(booking_data.fcm_token, heading, desc, 'RDRFCM', href);
 
-        const desc1 = `Booking Assigned: (${booking_id})`;
+        const desc1 = `Booking Assigned : ${booking_id}`;
         createNotification(heading, desc1, 'Roadside Assistance', 'RSA', 'Admin', '', rsa_id, href);
         if(rsa.fcm_token) {
             pushNotification(rsa.fcm_token, heading, desc1, 'RSAFCM', href);

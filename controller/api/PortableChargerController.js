@@ -9,6 +9,7 @@ import db from "../../config/db.js";
 import { asyncHandler, createNotification, formatDateInQuery, formatDateTimeInQuery, mergeParam, pushNotification, checkCoupon } from "../../utils.js";
 dotenv.config();
 import { tryCatchErrorHandler } from "../../middleware/errorHandler.js";
+import { io } from '../../server.js';
 
 export const chargerList = asyncHandler(async (req, resp) => {
     const {rider_id, page_no } = mergeParam(req);
@@ -36,7 +37,7 @@ export const chargerList = asyncHandler(async (req, resp) => {
         slot_data  : slotData,
         total_page : result.totalPage,
         total      : result.total,
-        base_url   : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/portable-charger/`,
+        base_url   : `${process.env.DIR_UPLOADS}portable-charger/`,
     });
 });
 
@@ -251,14 +252,28 @@ export const chargerBookingList = asyncHandler(async (req, resp) => {
         FROM portable_charger_booking WHERE rider_id = ? AND ${statusCondition} ${orderBy} LIMIT ${parseInt(start)}, ${parseInt(limit)}
     `;
     const [bookingList] = await db.execute(bookingsQuery, [rider_id, ...statusParams]);
-
-    const inProcessQuery = `SELECT rescheduled_booking, booking_id, service_name, ROUND(portable_charger_booking.service_price/100, 2) AS service_price, service_type, user_name, country_code, contact_no, slot_time, status, 
-        ${formatDateTimeInQuery(['created_at'])}, ${formatDateInQuery(['slot_date'])}
-        FROM portable_charger_booking WHERE rider_id = ? AND status NOT IN (?, ?, ?, ?, ?, ?) ${orderBy} LIMIT ${parseInt(start)}, ${parseInt(limit)}
-    `;
-    const inProcessParams        = ['CNF', 'C', 'PU', 'RO', 'PNR', 'CC'];
-    const [inProcessBookingList] = await db.execute(inProcessQuery, [rider_id, ...inProcessParams]);
-
+    
+    let inProcessBookingList = [];
+    
+    if(bookingStatus === 'S' ) {
+     
+       
+        const inProcessQuery = `
+            SELECT 
+                rescheduled_booking, booking_id, service_name, ROUND(portable_charger_booking.service_price/100, 2) AS service_price, service_type, user_name, country_code, contact_no, slot_time,
+                status, ${formatDateTimeInQuery(['created_at'])}, ${formatDateInQuery(['slot_date'])}
+            FROM 
+                portable_charger_booking 
+            WHERE 
+                rider_id = ? AND status NOT IN (?, ?, ?, ?, ?, ?) 
+            ${orderBy} 
+            LIMIT 
+                ${parseInt(start)}, ${parseInt(limit)}
+        `;
+        const inProcessParams = ['CNF', 'C', 'PU', 'RO', 'PNR', 'CC'];
+        const [inProcessrow] = await db.execute(inProcessQuery, [rider_id, ...inProcessParams]);
+        inProcessBookingList = inProcessrow;
+    }
     return resp.json({
         message    : ["Portable Charger Booking List fetched successfully!"],
         data       : bookingList,
@@ -266,7 +281,7 @@ export const chargerBookingList = asyncHandler(async (req, resp) => {
         inProcessBookingList,
         status     : 1,
         code       : 200,
-        base_url   : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/portable-charger/`,
+        base_url    : `${process.env.DIR_UPLOADS}portable-charger/`,
         noResultMsg : 'There are no recent bookings. Please schedule your booking now.'
     });
 });
@@ -286,10 +301,6 @@ export const chargerBookingDetail = asyncHandler(async (req, resp) => {
         LIMIT 1`, 
     [rider_id, booking_id]);
 
-    if (booking && ( booking.status == 'CS' || booking.status == 'PU' || booking.status == 'RO' ) ) {
-        const invoice_id = booking.booking_id.replace('PCB', 'INVPC');
-        booking.invoice_url = `https://plusx.s3.ap-south-1.amazonaws.com/public/portable-charger-invoice/${invoice_id}-invoice.pdf`;
-    }
     if(booking.vehicle_data == '' || booking.vehicle_data == null) {
         const vehicledata = await queryDB(`
             SELECT                 
@@ -351,7 +362,7 @@ export const getPcSubscriptionList = asyncHandler(async (req, resp) => {
         status: 1,
         subscription_price: sPrice,
         code: 200,
-        subscription_img: `https://plusx.s3.ap-south-1.amazonaws.com/public/pod-no-subscription.jpeg`,
+        subscription_img: `${req.protocol}://${req.get('host')}/public/pod-no-subscription.jpeg`,
     });
 });
 
@@ -388,7 +399,6 @@ export const invoiceList = asyncHandler(async (req, resp) => {
         data       : result.data,
         total_page : result.totalPage,
         total      : result.total,
-        base_url   : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/offer/`,
     });
 });
 export const invoiceDetails = asyncHandler(async (req, resp) => {
@@ -410,8 +420,6 @@ export const invoiceDetails = asyncHandler(async (req, resp) => {
             pci.invoice_id = ?
     `, [invoice_id]);
 
-    invoice.invoice_url = `https://plusx.s3.ap-south-1.amazonaws.com/uploads/portable-charger-invoice/${invoice_id}-invoice.pdf`;
-
     return resp.json({
         message : ["Pick & Drop Invoice Details fetch successfully!"],
         data    : invoice,
@@ -425,10 +433,11 @@ export const userCancelPCBooking = asyncHandler(async (req, resp) => {
     const { rider_id, booking_id, reason='' } = mergeParam(req);
     const { isValid, errors } = validateFields(mergeParam(req), {rider_id: ["required"], booking_id: ["required"] });
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
- 
+    
     const checkOrder = await queryDB(`
         SELECT  
-            pcb.rsa_id, pcb.address, pcb.slot_time, pcb.user_name, DATE_FORMAT(pcb.slot_date, '%Y-%m-%d') AS slot_date, pcb.country_code, pcb.contact_no, riders.rider_email , riders.rider_name, riders.fcm_token, rsa.fcm_token as rsa_fcm_token, pcb.vehicle_data
+            rsa.rsa_name,rsa.email as rsa_email, pcb.rsa_id, pcb.address, pcb.slot_time, pcb.user_name, DATE_FORMAT(pcb.slot_date, '%Y-%m-%d') AS slot_date, pcb.country_code, 
+            pcb.contact_no, riders.rider_email, riders.rider_name, riders.fcm_token, rsa.fcm_token as rsa_fcm_token, pcb.vehicle_data
         FROM  
             portable_charger_booking pcb
         LEFT JOIN  
@@ -463,20 +472,34 @@ export const userCancelPCBooking = asyncHandler(async (req, resp) => {
  
     const href    = `portable_charger_booking/${booking_id}`;
     const title   = 'Portable Charging Booking!';
-    const message = `Booking Cancelled!(${booking_id})`;
+    const message = `Booking Cancelled : ${booking_id}`;
     await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'Rider',  rider_id, '', href);
  
-    if(checkOrder.rsa_id) {
+    if(checkOrder.rsa_id ||  checkOrder.rsa_id!=null) {
         await db.execute(`DELETE FROM portable_charger_booking_assign WHERE order_id=? AND rider_id=?`, [booking_id, rider_id]);
         pushNotification(checkOrder.rsa_fcm_token, title, message, 'RSAFCM', href); 
-    }
+        const RSAhtml = `<html>
+            <body>
+                <h4>Dear ${checkOrder.rsa_name},</h4>
+                <p>This is to inform you that a user has cancelled their booking for the Portable EV Charging Service. Please find the details below:</p>
+                <p>Booking Details:</p>
+                <p>Customer Name       : ${checkOrder.user_name}</p>
+                <p>Contact No          : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
+                <p>Address             : ${checkOrder.address}</p>
+                <p>Service Date & Time : ${moment(checkOrder.slot_date, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(checkOrder.slot_time, 'HH:mm').format('h:mm A')}  </p> 
+                <p>Vehicle Details     : ${checkOrder.vehicle_data}</p>
+                <p>Thank you for your attention to this update.</p>
+                <p>Best regards,<br/>PlusX Electric Team </p>
+            </body>
+        </html>`;
+        emailQueue.addEmail(checkOrder.rsa_email, `Portable Charger Service Booking Cancellation (Booking ID: ${booking_id} ) `, RSAhtml);
+     }
     const html = `<html>
         <body>
             <h4>Dear ${checkOrder.user_name},</h4>
             <p>We would like to inform you that your booking for the portable charger has been successfully cancelled. Below are the details of your cancelled booking:</p>
             <p>Booking ID    : ${booking_id}</p>
             <p>Date and Time : ${moment(checkOrder.slot_date, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(checkOrder.slot_time, 'HH:mm').format('h:mm A')}</p>
-
             <p>Thank you for using PlusX Electric. We look forward to serving you again soon.</p>
             <p>Best regards,<br/>PlusX Electric Team </p>
         </body>
@@ -490,13 +513,14 @@ export const userCancelPCBooking = asyncHandler(async (req, resp) => {
             <p>Customer Name       : ${checkOrder.user_name}</p>
             <p>Contact No          : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
             <p>Address             : ${checkOrder.address}</p>
-            <p>Service Date & Time : ${checkOrder.slot_date} - ${checkOrder.slot_time}</p> 
+            <p>Service Date & Time : ${moment(checkOrder.slot_date, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(checkOrder.slot_time, 'HH:mm').format('h:mm A')}  </p> 
             <p>Vehicle Details     : ${checkOrder.vehicle_data}</p>
             <p>Thank you for your attention to this update.</p>
             <p>Best regards,<br/>PlusX Electric Team </p>
         </body>
     </html>`;
     emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Portable Charger Service Booking Cancellation ( Booking ID : ${booking_id} )`, adminHtml); 
+    io.emit('notification-list', {msCount : 1});
     return resp.json({ message: ['Your booking has been successfully cancelled.'], status: 1, code: 200 });
 });
 
@@ -535,24 +559,26 @@ export const userFeedbackPCBooking = asyncHandler(async (req, resp) => {
         if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
         
         const href    = `portable_charger_booking/${booking_id}`;
-        const title   = 'Portable Charger Feedback!';
-        const message = `Feedback Received - Booking ID: ${booking_id}.`;
+        // const title   = 'Portable Charger Feedback!';
+        // const message = `Feedback Received - Booking ID: ${booking_id}.`;
+        const title   = `Feedback Received- ${booking_id}`;
+        const message = `You've received feedback from a customer`;
         await createNotification(title, message, 'Portable Charging Booking', 'Admin', 'Rider', rider_id, '', href);
 
         const adminHtml = `<html>
             <body>
                 <h4>Dear Admin,</h4>
                 <p>You have received feedback from a customer via the PlusX app.</p>
-                Customer Name : ${checkOrder.user_name}<br>
-                Booking ID    : ${booking_id}<br>
-                <p>Rating   :  ${ parseInt(rating) }</p> 
-                <p>Feedback :  ${description}</p>
+                <p>Customer Name : ${checkOrder.user_name}</p>
+                <p>Booking ID    : ${booking_id}</p>
+                <p>Rating        : ${ parseInt(rating) }</p> 
+                <p>Feedback      : ${description}</p>
                 <p>Please review the feedback and take any necessary actions.</p>
                 <p>Best regards,<br/>PlusX Electric Team</p>
             </body>
         </html>`;
         emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Customer Feedback Received - Booking ID: ${booking_id}`, adminHtml); 
-
+        io.emit('notification-list', {msCount : 1});
         return resp.json({ message: ['Feedback added successfully!'], status: 1, code: 200 });
     } else {
         return resp.json({ message: ['Feedback already submitted!'], status: 0, code: 200 });
@@ -615,11 +641,13 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
             SELECT
                 pcb.user_name, pcb.country_code, pcb.contact_no, pcb.address, pcb.latitude, pcb.longitude,
                 pcb.rescheduled_booking, pcb.slot_date, pcb.slot_time, rd.fcm_token, rd.rider_email, 
-                pcb.vehicle_data
+                pcb.vehicle_data, rsa.rsa_name, rsa.fcm_token as rsa_fcm_token, rsa.email as rsa_email, pcb.rsa_id
             FROM 
                 portable_charger_booking as pcb
             LEFT JOIN
                 riders AS rd ON rd.rider_id = pcb.rider_id
+            LEFT JOIN
+                rsa ON rsa.rsa_id = pcb.rsa_id
             WHERE 
                 pcb.booking_id = ? AND pcb.rider_id = ?
             LIMIT 1
@@ -652,17 +680,15 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
             device_name         : device_name,
             rescheduled_booking : 1
         }
-        await updateRecord('portable_charger_booking', updtFields, ['booking_id', 'rider_id'], [booking_id, rider_id]); 
-
-        await updateRecord('portable_charger_booking_assign', {slot_date_time : fSlotDateTime}, ['order_id', 'rider_id'], [booking_id, rider_id]);
-        
-        const insert = await insertRecord('portable_charger_history', ['booking_id', 'rider_id', 'order_status'], [booking_id, rider_id, 'CNF']);  //, conn
+        await updateRecord('portable_charger_booking', updtFields, ['booking_id', 'rider_id'], [booking_id, rider_id]); //, conn 
+        await updateRecord('portable_charger_booking_assign', { slot_date_time : fSlotDateTime }, ['order_id', 'rider_id'], [booking_id, rider_id]);
+        const insert = await insertRecord('portable_charger_history', ['booking_id', 'rider_id', 'order_status'], [booking_id, rider_id, 'CNF']);
         
         if(insert.affectedRows == 0) return resp.json({status:0, code:200, message: ["Oops! Something went wrong. Please try again."]});
 
         const href    = 'portable_charger_booking/' + booking_id;
         const heading = 'Portable Charging Booking!';
-        const desc    = `Rescheduled Booking Confirmed! (${booking_id})`;
+        const desc    = `Rescheduled Booking Confirmed! ${booking_id}`;
         createNotification(heading, desc, 'Portable Charging Booking', 'Rider', 'Admin','', rider_id, href);
         createNotification(heading, desc, 'Portable Charging Booking', 'Admin', 'Rider',  rider_id, '', href);
         pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
@@ -696,9 +722,30 @@ export const reScheduleBooking = asyncHandler(async (req, resp) => {
         </html>`;
         emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Portable Charger Booking Rescheduled (Booking ID : ${booking_id} )`, htmlAdmin);
         
+        if(checkOrder.rsa_id ){
+ 
+            pushNotification(checkOrder.rsa_fcm_token, heading, desc, 'RSAFCM', href);
+           
+            const htmlDriver = `<html>
+                <body>
+                    <h4>Dear ${checkOrder.rsa_name},</h4>
+                    <p>This is to inform you that a user has rescheduled their Portable EV Charging Service booking. Please find the updated booking details below:</p>
+                    
+                    <p>User Name       : ${checkOrder.user_name}</p>
+                    <p>User Contact    : ${checkOrder.country_code}-${checkOrder.contact_no}</p>
+                    <p>Booking ID      : ${booking_id}</p>
+                    <p>New Scheduled Date & Time : ${moment(fSlotDate, 'YYYY MM DD').format('D MMM, YYYY,')} ${moment(slot_time, 'HH:mm').format('h:mm A')}</p>
+                    <p>Location        : ${checkOrder.address}</p>       
+                    <p>Vechile Details : ${checkOrder.vehicle_data}</p>
+                    <a href="https://www.google.com/maps?q=${checkOrder.latitude},${checkOrder.longitude}">Address Link</a><br>
+                    <p>Best regards,<br/> PlusX Electric Team </p>
+                </body>
+            </html>`;
+            emailQueue.addEmail(checkOrder.rsa_email, `Portable Charger Booking Rescheduled (Booking ID: ${booking_id})`, htmlDriver);
+        }
         let respMsg = "Booking request received! Your booking has been successfully rescheduled. Our team will arrive at the updated time.";
 
-        // await commitTransaction(conn);
+        io.emit('notification-list', {msCount : 1});
         return resp.json({
             status        : 1, 
             code          : 200,

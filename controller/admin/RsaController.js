@@ -13,7 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export const rsaList = asyncHandler(async (req, resp) => {
-    const{ rsa_id, rsa_name, rsa_email, rsa_mobile, page = 1, list, service_type, start_date, end_date, search_text = ''} = req.body;
+    const{ rsa_id, rsa_name, rsa_email, rsa_mobile, page_no = 1, list, service_type, start_date, end_date, search_text = ''} = req.body;
 
     const searchField = [];
     const searchText = [];
@@ -42,7 +42,6 @@ export const rsaList = asyncHandler(async (req, resp) => {
         whereValues.push(start, end);
         whereOperators.push('>=', '<=');
     }
-
     const result = await getPaginatedData({
         tableName: 'rsa',
         columns: 'id, rsa_id, rsa_name, email, country_code, mobile, profile_img, status, booking_type',
@@ -52,7 +51,7 @@ export const rsaList = asyncHandler(async (req, resp) => {
         liveSearchTexts: [search_text, search_text, search_text, search_text,],
         sortColumn: 'id',
         sortOrder: 'DESC',
-        page_no: page,
+        page_no: page_no,
         limit: 10,
         whereField: whereFields,
         whereValue: whereValues,
@@ -86,7 +85,7 @@ export const rsaData = asyncHandler(async (req, resp) => {
         bookingType,
         // bookingHistory,
         locationHistory,
-        base_url: `https://plusx.s3.ap-south-1.amazonaws.com/uploads/rsa_images/`
+        base_url: `${process.env.DIR_UPLOADS}rsa_images/`
     });
 });
 export const driverBookingList = async (req, resp) => {
@@ -193,8 +192,72 @@ export const allRsaList = async (req, resp) => {
         return resp.status(500).json({ status: 0, message: 'Error fetching charger booking lists' });
     }
 };
-
 export const rsaAdd = asyncHandler(async (req, resp) => {
+    const{ rsa_name, rsa_email, mobile, service_type, password, confirm_password } = req.body;
+    const { isValid, errors } = validateFields(req.body, { 
+        rsa_name         : ["required"],
+        rsa_email        : ["required"],
+        mobile           : ["required"],
+        service_type     : ["required"],
+        password         : ["required"],
+        confirm_password : ["required"],
+    });
+    if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
+    if(password.length < 6) return resp.json({status:0, code: 422, message:["Password must be 6 digit"]});
+    if(password != confirm_password) return resp.json({ status: 0, code: 422, message: ['Password and confirm password not matched!'] });
+    // const [mobileCheck] = await db.query(`
+    //     SELECT 
+    //         rsa_id 
+    //     FROM 
+    //         rsa 
+    //     WHERE 
+    //         mobile = ? 
+    //     UNION ALL 
+    //         SELECT 
+    //             rider_id 
+    //         FROM 
+    //             riders 
+    //         WHERE 
+    //             rider_mobile = ?`, 
+    // [mobile, mobile] );
+    
+    // if (mobileCheck.length > 0) return resp.json({ status : 0, code : 200, message : "Mobile number already exists"});
+    
+    const [duplicateCheck] = await db.query(`
+        SELECT 'mobile' AS type FROM rsa WHERE mobile = ?
+        UNION
+            SELECT 'email' AS type FROM rsa WHERE email = ?
+        UNION
+            SELECT 'mobile' AS type FROM riders WHERE rider_mobile = ?
+        UNION
+        SELECT 'email' AS type FROM riders WHERE rider_email = ?
+    `, [mobile, rsa_email, mobile, rsa_email]);
+    
+    const types = duplicateCheck.map(row => row.type);
+    if (types.includes('mobile') && types.includes('email')) {
+        return resp.json({ status: 0, code: 422, message: ["Mobile number and Email already exist"] });
+        
+    } else if (types.includes('mobile')) {
+        return resp.json({ status: 0, code: 422, message: ["Mobile number already exists"] });
+        
+    } else if (types.includes('email')) {
+        return resp.json({ status: 0, code: 422, message: ["Email already exists"] });
+    }
+    let profile_image = req.files['profile_image'] ? req.files['profile_image'][0].filename  : '';
+    const hashedPswd  = await bcrypt.hash(password, 10);
+    const insert = await insertRecord('rsa', [
+        'rsa_id', 'rsa_name', 'email', 'country_code', 'mobile', 'booking_type', 'password', 'status', 'running_order', 'profile_img'
+    ], [
+        `RSA-${generateUniqueId({length:8})}`, rsa_name, rsa_email, '+971', mobile, service_type, hashedPswd, 0, 0, profile_image
+    ]);
+    
+    return resp.json({
+        status  : insert.affectedRows > 0 ? 1 : 0, 
+        code    : insert.affectedRows > 0 ? 200 : 422, 
+        message : insert.affectedRows > 0 ? "RSA created successfully" :[ "Failed to create, Please Try Again!"], 
+    });
+});
+export const rsaAddOld = asyncHandler(async (req, resp) => {
     const{ rsa_name, rsa_email, mobile, service_type, password, confirm_password } = req.body;
     const { isValid, errors } = validateFields(req.body, { 
         rsa_name         : ["required"],
@@ -208,7 +271,7 @@ export const rsaAdd = asyncHandler(async (req, resp) => {
     if(password.length < 6) return resp.json({status:1, code: 422, message:["Password must be 6 digit"]});
     if(password != confirm_password) return resp.json({ status: 0, code: 422, message: ['Password and confirm password not matched!'] });
 
-    const mobileCheck = await db.query(`
+    const [mobileCheck] = await db.query(`
         SELECT 
             rsa_id 
         FROM 
@@ -224,7 +287,7 @@ export const rsaAdd = asyncHandler(async (req, resp) => {
                 rider_mobile = ?`, 
     [mobile, mobile] );
    
-    if (mobileCheck.length > 0) return resp.json({status:1, code: 200, message:["Mobile number already exists"]});
+    if (mobileCheck.length > 0) return resp.json({ status:0, code: 200, message:"Mobile number already exists"});
 
     let profile_image = req.files['profile_image'] ? req.files['profile_image'][0].filename  : '';
     const hashedPswd = await bcrypt.hash(password, 10);

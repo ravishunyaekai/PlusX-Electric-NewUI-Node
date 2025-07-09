@@ -15,6 +15,11 @@ dotenv.config();
 import cron from 'node-cron';
 import { failedPODBooking, failedValetBooking, failedRSABooking } from './controller/TestController.js';
 
+import { Server } from 'socket.io'; 
+import http from 'http';
+
+// const io = new Server(server);
+
 const app  = express();
 const PORT = process.env.PORT || 3435;
 
@@ -94,6 +99,32 @@ app.get('/payment-cancel', (req, res) => {
 app.use(errorHandler);
 
 
-app.listen(PORT, ()=>{
-    console.log(`Server is running on port ${PORT}`);
+const server = http.createServer(app);
+
+export const io = new Server(server, {
+    cors : corsOptions,
+});
+
+// io.on('connection', (socket) => {
+//     console.log('A user connected:', socket.id);
+
+//     // Send notifications every 5 seconds
+//     // const interval = setInterval(() => {
+//     //     socket.emit('notification-list', {
+//     //         title: 'Reminder',
+//     //         message: `Hello, this is a notification at ${new Date().toLocaleTimeString()}`,
+//     //     });
+//     // }, 5000); // Every 2 seconds
+//     socket.on('disconnect', () => {
+//         console.log('User disconnected:', socket.id);
+//         // clearInterval(interval); // Cleanup
+//     });
+// });
+
+// app.listen(PORT, ()=>{
+//     console.log(`Server is running on port ${PORT}`);
+// });
+
+server.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
 });

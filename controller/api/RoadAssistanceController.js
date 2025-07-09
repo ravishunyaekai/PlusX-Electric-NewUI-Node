@@ -7,6 +7,7 @@ import db from "../../config/db.js";
 import { asyncHandler, createNotification, formatDateTimeInQuery, mergeParam, checkCoupon } from '../../utils.js';
 dotenv.config();
 import { tryCatchErrorHandler } from "../../middleware/errorHandler.js";
+import { io } from '../../server.js';
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -39,7 +40,6 @@ export const addRoadAssistance = asyncHandler(async (req, resp) => {
     if (!isValid) return resp.json({ status: 0, code: 422, message: errors });
 
     try {
-        //  (SELECT count(id) from riders_vehicles where rider_id =? and vehicle_id = ? ) as vehicle_count,
         const riderAddress = await queryDB(`
             SELECT 
                 landmark,
@@ -60,7 +60,7 @@ export const addRoadAssistance = asyncHandler(async (req, resp) => {
         [ rider_id, vehicle_id, battery_percent, rider_id, address_id ]);
 
         if(!riderAddress) return resp.json({ message : ["Address Id not valid!"], status: 0, code: 422, error: true });
-        if(riderAddress.vehicle_data == '') return resp.json({ message : ["Vehicle Id not valid!"], status: 0, code: 422, error: true });
+        if(riderAddress.vehicle_data == '' || riderAddress.vehicle_data == null) return resp.json({ message : ["Vehicle Id not valid!"], status: 0, code: 422, error: true });
 
         const additional_price = (battery_percent == 0 ) ? parseFloat(riderAddress.additional_price) : 0.0 ;
         const booking_price    = parseFloat(riderAddress.booking_price) + additional_price 
@@ -68,7 +68,7 @@ export const addRoadAssistance = asyncHandler(async (req, resp) => {
         const bookingPrice     = Math.floor( ( parseFloat(booking_price) + parseFloat(vatAmt) ) * 100) ;
 
         if(parseFloat(service_price) != bookingPrice && coupon_code == '') { 
-            return resp.json({ message : ['Booking price is not valid!'], status: 0, code: 422, error: true });
+            return resp.json({ message : ['Coupon code is required'], status: 0, code: 422, error: true });
         }
         else if(parseFloat(service_price) != bookingPrice && coupon_code) {
             const servicePrice = parseFloat(service_price) ;
@@ -140,20 +140,23 @@ export const roadAssistanceList = asyncHandler(async (req, resp) => {
             ${parseInt(start)}, ${parseInt(limit)}
     `;
     const [bookingList] = await db.execute(bookingsQuery, [rider_id, ...statusParams]);
-
-    const inProcessQuery = `
-        SELECT 
-            request_id, ROUND(road_assistance.price/100, 2) AS price, name, country_code, contact_no, order_status, ${formatDateTimeInQuery(['created_at'])}, pickup_address
-        FROM 
-            road_assistance 
-        WHERE 
-            rider_id = ? AND order_status NOT IN (?, ?, ?, ?, ?, ?) ${orderBy} 
-        LIMIT 
-            ${parseInt(start)}, ${parseInt(limit)}
-    `;
-    const inProcessParams        = ['CNF', 'C', 'PU', 'RO', 'PNR', 'CC'];
-    const [inProcessBookingList] = await db.execute(inProcessQuery, [rider_id, ...inProcessParams]);
-
+    
+    let inProcessBookingList = [];
+    if(bookingStatus === 'S'){
+        const inProcessQuery = `
+            SELECT 
+                request_id, ROUND(road_assistance.price/100, 2) AS price, name, country_code, contact_no, order_status, ${formatDateTimeInQuery(['created_at'])}, pickup_address
+            FROM 
+                road_assistance 
+            WHERE 
+                rider_id = ? AND order_status NOT IN (?, ?, ?, ?, ?, ?) ${orderBy} 
+            LIMIT 
+                ${parseInt(start)}, ${parseInt(limit)}
+        `;
+        const inProcessParams = ['CNF', 'C', 'PU', 'RO', 'PNR', 'CC'];
+        const [inProcessrow]  = await db.execute(inProcessQuery, [rider_id, ...inProcessParams]);
+        inProcessBookingList  = inProcessrow;
+    }
     return resp.json({
         status     : 1,
         code       : 200,
@@ -162,7 +165,7 @@ export const roadAssistanceList = asyncHandler(async (req, resp) => {
         total_page : totalPage,
         total      : total,
         inProcessBookingList,
-        base_url   : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/road-assistance/`,
+        base_url    : `${process.env.DIR_UPLOADS}road-assistance/`,
         noResultMsg : 'There are no recent bookings. Please schedule your booking now.'
     });
 });
@@ -193,7 +196,7 @@ export const roadAssistanceDetail = asyncHandler(async (req, resp) => {
             order_history 
         WHERE 
             order_id = ?
-        ORDER BY id DESC
+        ORDER BY id ASC
     `,[order_id]);
 
     if(roadAssistance.vehicle_data == '' || roadAssistance.vehicle_data == null) {
@@ -271,6 +274,7 @@ export const roadAssistanceInvoiceDetail = asyncHandler(async (req, resp) => {
         WHERE 
             rsi.invoice_id = ?
     `, [invoice_id]);
+
     return resp.json({
         message : ["Road Assistance Invoice Details fetch successfully!"],
         data    : invoice,
@@ -314,8 +318,10 @@ export const userFeedbacRSABooking = asyncHandler(async (req, resp) => {
         if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
         
         const href    = `road_assistance/${booking_id}`;
-        const title   = 'Roadside Assistance Feedback!';
-        const message = `Feedback Received - Booking ID: ${booking_id}.`;
+        // const title   = 'Roadside Assistance Feedback!';
+        // const message = `Feedback Received - Booking ID: ${booking_id}.`;
+        const title   = `Feedback Received- ${booking_id}`;
+        const message = `You've received feedback from a customer`;
         await createNotification(title, message, 'Roadside Assistance', 'Admin', 'Rider', rider_id, '', href);
 
         const adminHtml = `<html>
@@ -331,7 +337,7 @@ export const userFeedbacRSABooking = asyncHandler(async (req, resp) => {
             </body>
         </html>`;
         emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Customer Feedback Received - Booking ID: ${booking_id}`, adminHtml);
-
+        io.emit('notification-list', {msCount : 1});
         return resp.json({ message: ['Feedback added successfully!'], status: 1, code: 200 });
     } else {
         return resp.json({ message: ['Feedback already submitted!'], status: 0, code: 200 });

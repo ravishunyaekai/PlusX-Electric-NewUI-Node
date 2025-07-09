@@ -142,7 +142,7 @@ const acceptBooking = async (req, resp) => {
 
         const href    = `charging_service/${booking_id}`;
         const title   = 'EV Pick Up & Drop Off Booking!';
-        const message = `Booking Accepted! (${booking_id})`;
+        const message = `Booking Accepted! ${booking_id}`;
          await createNotification(title, message, 'Charging Service', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
        // await createNotification(title, message, 'Charging Service', 'Admin', 'RSA', rsa_id, '', href);
          await pushNotification(checkOrder.fcm_token, title, message, 'RDRFCM', href);

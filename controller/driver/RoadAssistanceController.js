@@ -41,7 +41,7 @@ export const getRsaOrderStage = asyncHandler(async (req, resp) => {
         status          : 1,
         code            : 200,
         message         : ["Booking stage fetch successfully."],
-        booking_status  : booking.status,
+        booking_status  : booking.order_status,
         execution_time  : humanReadableDuration,
         booking_history : bookingTracking,
         image_path      : `${process.env.DIR_UPLOADS}road-assistance/`
@@ -146,7 +146,7 @@ const acceptBooking = async (req, resp) => {
 
         const href    = `road_assistance/${booking_id}`;
         const title   = 'EV Roadside Assistance';
-        const message = `Booking Accepted! ID: ${booking_id}`;
+        const message = `Booking Accepted! ID : ${booking_id}`;
         await createNotification(title, message, 'Roadside Assistance', 'Rider', 'RSA', rsa_id, checkOrder.rider_id, href);
 
         // await createNotification(title, message, 'Roadside Assistance', 'Admin', 'RSA', rsa_id, '', href);
@@ -330,7 +330,8 @@ const chargingComplete = async (req, resp) => {
         if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
 
         await updateRecord('road_assistance', {order_status: 'CC', rsa_id, end_charging_level:sumOfLevel }, ['request_id'], [booking_id] );
-        await updateRecord('pod_devices', { charging_status : 0 }, ['pod_id'], [checkOrder.pod_id] );
+        // await updateRecord('pod_devices', { charging_status : 0 }, ['pod_id'], [checkOrder.pod_id] );
+        await db.execute( `UPDATE pod_devices SET charging_status = 0, temp1 = temp1 + 9, temp2 = temp2 + 7 WHERE pod_id = ?`, [checkOrder.pod_id] );
 
         const href    = `road_assistance/${booking_id}`;
         const title   = 'EV Roadside Assistance';

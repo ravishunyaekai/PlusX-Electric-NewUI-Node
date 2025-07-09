@@ -11,6 +11,7 @@ import emailQueue from '../emailQueue.js';
 dotenv.config();
 
 import { tryCatchErrorHandler } from "../middleware/errorHandler.js";
+import { io } from '../server.js';
 
 const stripe     = new Stripe(process.env.STRIPE_SECRET_KEY);
 const __filename = fileURLToPath(import.meta.url);
@@ -41,7 +42,7 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
         if (!checkOrder) {
             return resp.json({ 
                 message : [`We have received your booking. Our team will get in touch with you soon!`], 
-                status  : 0, 
+                status  : 1, 
                 code    : 200 
             });
         }
@@ -69,7 +70,7 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
  
             const href    = 'charging_service/' + request_id;
             const heading = 'EV Pick Up & Drop Off Booking!';
-            const desc    = `Booking Confirmed! (${request_id})`;
+            const desc    = `Booking Confirmed! ${request_id}`;
             createNotification(heading, desc, 'Charging Service', 'Rider', 'Admin','', rider_id, href);
             createNotification(heading, desc, 'Charging Service', 'Admin', 'Rider', rider_id, '', href);
             pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
@@ -107,6 +108,7 @@ export const pickAndDropInvoice = asyncHandler(async (req, resp) => {
             emailQueue.addEmail(process.env.MAIL_CS_ADMIN, `EV Pickup and Drop-Off - ${request_id}`, htmlAdmin);
  
             // await commitTransaction(conn);
+            io.emit('notification-list', {msCount : 1});
             let responseMsg = 'We have received your booking. Our team will get in touch with you soon!';
             return resp.json({ message: [responseMsg], status: 1, code: 200 });
         } else {
@@ -175,7 +177,7 @@ export const portableChargerInvoice = asyncHandler(async (req, resp) => {
 
             const href    = 'portable_charger_booking/' + request_id;
             const heading = 'Portable Charging Booking!';
-            const desc    = `Booking Confirmed! (${request_id})`;
+            const desc    = `Booking Confirmed! ${request_id}`;
             createNotification(heading, desc, 'Portable Charging Booking', 'Rider', 'Admin','', rider_id, href);
             createNotification(heading, desc, 'Portable Charging Booking', 'Admin', 'Rider',  rider_id, '', href);
             pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
@@ -208,6 +210,7 @@ export const portableChargerInvoice = asyncHandler(async (req, resp) => {
             </html>`;
             emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Portable Charger Booking - ${request_id}`, htmlAdmin);
             
+            io.emit('notification-list', {msCount : 1});
             // await commitTransaction(conn);
             let respMsg = "Booking Request Received! Thank you for booking our portable charger service for your EV. Our team will arrive at the scheduled time."; 
             return resp.json({ message: [respMsg], status: 1, code: 200 });
@@ -237,8 +240,7 @@ export const rsaInvoice = asyncHandler(async (req, resp) => {
         const checkOrder = await queryDB(`
             SELECT 
                 rsa.name, rsa.country_code, rsa.contact_no, rsa.pickup_address, rsa.pickup_latitude, 
-                rsa.pickup_longitude, rd.fcm_token, rd.rider_email, 
-                (SELECT CONCAT(vehicle_make, "-", vehicle_model) FROM riders_vehicles as rv WHERE rv.vehicle_id = rsa.vehicle_id ) AS vehicle_data
+                rsa.pickup_longitude, rd.fcm_token, rd.rider_email, rsa.vehicle_data
             FROM 
                 road_assistance as rsa
             LEFT JOIN
@@ -280,7 +282,8 @@ export const rsaInvoice = asyncHandler(async (req, resp) => {
 
             const href    = 'road_assistance/' + request_id;
             const heading = 'EV Roadside Assistance';
-            const desc    = `Booking Confirmed! ID: (${request_id})`;
+            const desc    = `Booking Confirmed! ID : ${request_id}`;
+
             createNotification(heading, desc, 'Roadside Assistance', 'Rider', 'Admin','', rider_id, href);
             
             createNotification(heading, desc, 'Roadside Assistance', 'Admin', 'Rider', rider_id, '', href);
@@ -313,6 +316,7 @@ export const rsaInvoice = asyncHandler(async (req, resp) => {
             const adminEmails = [process.env.MAIL_POD_ADMIN, process.env.MAIL_CHINTAN, process.env.MAIL_NADIA];
             emailQueue.addEmail(adminEmails, `EV Roadside Assistance Booking - ${request_id}`, htmlAdmin);
             
+            io.emit('notification-list', {msCount : 1});
             // await commitTransaction(conn);
             let respMsg = 'We have received your booking and our team will reach out to you soon.'; 
             return resp.json({ message: [respMsg], status: 1, code: 200 });

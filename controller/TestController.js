@@ -8,12 +8,14 @@ import db from "../config/db.js";
 
 import moment from 'moment/moment.js';
 import emailQueue from '../emailQueue.js';
-import { createNotification, pushNotification } from '../utils.js'; //, asyncHandler
+import { createNotification, pushNotification, mergeParam } from '../utils.js'; //, asyncHandler
 
 import Stripe from "stripe";
 import dotenv from 'dotenv';
 dotenv.config();
 // import axios from "axios";
+
+import { io } from '../server.js';
 
 import { tryCatchErrorHandler } from "../middleware/errorHandler.js";
 
@@ -22,43 +24,46 @@ const __dirname  = path.dirname(__filename);
 const stripe     = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export const getPaymentSessionData = async (req, resp) => {
-    
-    const sessionId = 'cs_live_a13WYio9mJG17Q22GdHbzchSVsw4pCa961U14ZCFFL7Jb8zFoSNVRadbml' ;
-    // pi_3RCfBaKKO9oLX4Mk1oMBmetX
+    const { session_id } = mergeParam(req);
+    // const session_id = 'cs_live_a13WYio9mJG17Q22GdHbzchSVsw4pCa961U14ZCFFL7Jb8zFoSNVRadbml' ;
     try {
-        // const session           = await pickAndDropBookingConfirm(sessionId, sessionId)
-        const session           = await stripe.checkout.sessions.retrieve(sessionId);
-        // const payment_intent_id = 'pi_3RCfeCKKO9oLX4Mk0dGrUugt'; //cus_RsErplKMuHjTZy   session.payment_intent;
-        // console.log("Checkout Session:", session);  pi_3RCfeCKKO9oLX4Mk0dGrUugt
-        
-        // const paymentIntent = await stripe.paymentIntents.retrieve(payment_intent_id);
-        // const charge       = await stripe.charges.retrieve(paymentIntent.latest_charge);  //payment_method       
-        
-        return resp.json({ session });
+        const session = await stripe.checkout.sessions.retrieve(session_id);
+        console.log(session)
+        if (session.status === 'open') {  //'open',
+            await stripe.checkout.sessions.expire(session_id);
+            console.log('Session expired successfully');
+            return resp.json({ 
+                status : 1, 
+                message: `Checkout Session Expired! Your checkout session has expired. Please start a new booking to continue.` 
+            });
+        }
+        if(session.status == 'complete') {
+            return resp.json({ status : 0, message: 'Payment received!' }); //paymentdata : session, 
+
+        } else {
+            return resp.json({ 
+                status : 1, 
+                message: `Checkout Session Expired! Your checkout session has expired. Please start a new booking to continue.` 
+            });
+        }
     } catch (error) {
         return resp.json({ error : error.message });
     }
 }
-
 export const getPaymentdetails = async (req, resp) => {
+    const {rider_id, payment_intent_id } = mergeParam(req);
     
-    const payment_intent_id = 'pi_3Rd99bKKO9oLX4Mk0d9iZUfK' ;
-    console.log(moment.unix('1750680435').format('YYYY-MM-DD HH:mm:ss') );
-    // const email = 'omvir@plusxelectric.com' ;
     try {
-        // const customers = await stripe.customers.list({ email });
-        // if (customers.data.length > 0) {
-        //     return resp.json( {
-        //         success      : true,
-        //         customer_id  : customers.data[0].id,
-        //         name         : customers.data[0].name //cus_SBIeUi7Wcpx8mM
-        //     });
-        // } else {
-        //     return resp.json({success: false, message: 'No customer found with this email'});
-        // }
         const paymentIntent = await stripe.paymentIntents.retrieve(payment_intent_id);
-        // const charge       = await stripe.charges.retrieve(paymentIntent.latest_charge);  //payment_method       
-        return resp.json({ invoice_date : moment.unix('1745474328').format('YYYY-MM-DD HH:mm:ss'), paymentIntent });
+        const paymentStatus = ['requires_payment_method', 'requires_confirmation', 'requires_action'] ;
+        console.log( paymentStatus.includes(paymentIntent.status) ) ;
+        return resp.json({ paymentIntent}); 
+        if(paymentIntent.status == 'succeeded') { //succeeded 
+            return resp.json({ status : 1, message: 'Payment received!', code : 200, content : '' }); //paymentdata : paymentIntent, 
+        } else {
+            // await stripe.paymentIntents.cancel(payment_intent_id);
+            return resp.json({ status : 0, message: 'Payment Not received', code : 422, content : `Checkout Session Expired! Your checkout session has expired. Please start a new booking to continue.` });
+        }
     } catch (error) {
         return resp.json({ error : error.message });
     }
@@ -137,6 +142,7 @@ const BookingConfirm = async (bookingType, bookingId, paymentIntentId, couponCod
 
 const portableChargerBookingConfirm = async (booking_id, payment_intent_id, couponCode ) => {
     // const conn = await startTransaction();
+
     try { 
         const checkOrder = await queryDB(`
             SELECT pcb.rider_id, pcb.user_name, pcb.country_code, pcb.contact_no, pcb.slot_date, pcb.slot_time, pcb.address, pcb.latitude, pcb.longitude,
@@ -149,7 +155,6 @@ const portableChargerBookingConfirm = async (booking_id, payment_intent_id, coup
                 pcb.booking_id = ? AND pcb.status = 'PNR'
             LIMIT 1
         `,[ booking_id ]);
-        
         if (!checkOrder) {
             return false;
         }
@@ -174,8 +179,8 @@ const portableChargerBookingConfirm = async (booking_id, payment_intent_id, coup
             await updateRecord('portable_charger_booking', { status : 'CNF', payment_intent_id}, ['booking_id', 'rider_id'], [booking_id, checkOrder.rider_id] );
 
             const href    = 'portable_charger_booking/' + booking_id;
-              const heading = 'Portable Charging Booking!';
-            const desc    = `Booking Confirmed! (${request_id})`;
+            const heading = 'Portable Charging Booking!';
+            const desc    = `Booking Confirmed! ${booking_id}`;
             createNotification(heading, desc, 'Portable Charging Booking', 'Rider', 'Admin','', checkOrder.rider_id, href);
             createNotification(heading, desc, 'Portable Charging Booking', 'Admin', 'Rider',  checkOrder.rider_id, '', href);
             pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
@@ -208,7 +213,7 @@ const portableChargerBookingConfirm = async (booking_id, payment_intent_id, coup
             </html>`;
             emailQueue.addEmail(process.env.MAIL_POD_ADMIN, `Portable Charger Booking - ${booking_id}`, htmlAdmin);
             
-            // await commitTransaction(conn);
+            io.emit('notification-list', {msCount : 1});
             
             return true;
         } else {
@@ -262,10 +267,8 @@ const pickAndDropBookingConfirm = async (request_id, payment_intent_id, couponCo
             await updateRecord('charging_service', { order_status : 'CNF', payment_intent_id }, ['request_id', 'rider_id'], [request_id, checkOrder.rider_id] );
 
             const href    = 'charging_service/' + request_id;
-            // const heading = 'EV Pick Up & Drop-Off Booking!';
-            // const desc    = `Booking Confirmed! ID: ${request_id}.`;
             const heading = 'EV Pick Up & Drop Off Booking!';
-            const desc    = `Booking Confirmed! (${request_id})`;
+            const desc    = `Booking Confirmed! ${request_id}`;
             createNotification(heading, desc, 'Charging Service', 'Rider', 'Admin','', checkOrder.rider_id, href);
             createNotification(heading, desc, 'Charging Service', 'Admin', 'Rider', checkOrder.rider_id, '', href);
             pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
@@ -302,7 +305,7 @@ const pickAndDropBookingConfirm = async (request_id, payment_intent_id, couponCo
                 </body>
             </html>`;
             emailQueue.addEmail(process.env.MAIL_CS_ADMIN, `EV Pickup and Drop-Off - ${request_id}`, htmlAdmin);
-            // await commitTransaction(conn);
+            io.emit('notification-list', {msCount : 1});
             return true
         } else {
             return false;
@@ -355,11 +358,10 @@ const rsaBookingConfirm = async (request_id, payment_intent_id, couponCode) => {
             await updateRecord('road_assistance', { order_status : 'CNF', payment_intent_id}, ['request_id', 'rider_id'], [request_id, checkOrder.rider_id] );
 
             const href    = 'road_assistance/' + request_id;
-            // const heading = 'Roadside Assistance Created';
-            // const desc    = `Booking Confirmed! : ( ${request_id} )`;
-             const heading = 'EV Roadside Assistance';
-            const desc    = `Booking Confirmed! ID: (${request_id})`;
+            const heading = 'EV Roadside Assistance';
+            const desc    = `Booking Confirmed! ID : ${request_id}`;
             createNotification(heading, desc, 'Roadside Assistance', 'Rider', 'Admin','', checkOrder.rider_id, href);
+            createNotification(heading, desc, 'Roadside Assistance', 'Admin', 'Rider',  checkOrder.rider_id, '', href);
             pushNotification(checkOrder.fcm_token, heading, desc, 'RDRFCM', href);
         
             const htmlUser = `<html>
@@ -389,7 +391,7 @@ const rsaBookingConfirm = async (request_id, payment_intent_id, couponCode) => {
             const adminEmails = [process.env.MAIL_POD_ADMIN, process.env.MAIL_CHINTAN, process.env.MAIL_NADIA];
             emailQueue.addEmail(adminEmails, `EV Roadside Assistance Booking - ${request_id}`, htmlAdmin);
             
-            // await commitTransaction(conn);
+            io.emit('notification-list', {msCount : 1});
             return true;
         } else {
             return false;

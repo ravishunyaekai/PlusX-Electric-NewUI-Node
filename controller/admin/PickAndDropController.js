@@ -526,9 +526,9 @@ export const PodAssignBooking = async (req, resp) => {
             [booking_id, booking_data.rider_id, rsa_id, booking_data.slot_date_time, 0]);
         await updateRecord('charging_service', { rsa_id: rsa_id }, ['request_id'], [booking_id]);
 
-        const href = 'charging_service/' + booking_id;
+        const href    = 'charging_service/' + booking_id;
         const heading = 'EV Pick Up & Drop Off Booking!';
-        const desc = `Booking Assigned: (${booking_id})`;
+        const desc    = `Booking Assigned: ${booking_id}`;
         createNotification(heading, desc, 'Charging Service', 'RSA', 'Admin', '', rsa_id, href);
         // pushNotification(booking_data.fcm_to ken, heading, desc, 'RDRFCM', href);
         pushNotification(rsa.fcm_token, heading, desc, 'RSAFCM', href);
@@ -538,8 +538,8 @@ export const PodAssignBooking = async (req, resp) => {
                 <h4>Dear ${rsa.rsa_name},</h4>
                 <p>A Booking of the EV Pick Up & Drop Off Service booking has been assigned to you.</p> 
                 <p>Booking Details:</p>
-                Booking ID: ${booking_id}<br>
-                Date and Time of Service: ${booking_data.slot_date_time}<br>        
+                <p>Booking ID: ${booking_id}</p>
+                <p>Date and Time of Service: ${moment(booking_data.slot_date_time, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</p>
                 <p> Best regards,<br/>PlusX Electric Team </p>
             </body>
         </html>`;

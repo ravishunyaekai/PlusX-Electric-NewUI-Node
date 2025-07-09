@@ -261,8 +261,8 @@ router.post('/auto-pay', autoPay);
 // router.post('/remove-card', removeCard);
 // router.post('/list-card', customerCardsList);
 
-router.get('/get-payment-session-data', getPaymentSessionData); 
-router.get('/get-payment-data', getPaymentdetails); 
+router.post('/get-payment-session-data', getPaymentSessionData); 
+router.post('/get-payment-data', getPaymentdetails); 
 
 // router.post('/failed-pod-booking', failedPODBooking); 
 // router.post('/failed-valet-booking', failedValetBooking); 

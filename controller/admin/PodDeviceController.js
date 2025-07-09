@@ -56,7 +56,7 @@ export const podDeviceDetails = async (req, resp) => {
 
         const [chargerDetails] = await db.execute(`
             SELECT 
-                pod_id, pod_name, device_id, design_model, inverter, charger, ${formatDateInQuery(['date_of_manufacturing'])}, status, ${formatDateTimeInQuery(['created_at'])}
+                pod_id, pod_name, device_id, design_model, inverter, charger, ${formatDateInQuery(['date_of_manufacturing'])}, status, ${formatDateTimeInQuery(['created_at'])}, temp1, temp2
             FROM 
                 pod_devices 
             WHERE 
@@ -359,7 +359,7 @@ export const podBrandList = async (req, resp) => {
             data       : result.data,
             total_page : result.totalPage,
             total      : result.total,
-            base_url   : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/pod-brand-images/`,
+            base_url   : `${process.env.DIR_UPLOADS}pod-brand-images/`,
         });
     } catch (error) {
         console.error('Error fetching device list:', error);
@@ -392,7 +392,7 @@ export const deviceBrandList = async (req, resp) => {
             data       : result.data,
             total_page : result.totalPage,
             total      : result.total,
-            base_url   : `https://plusx.s3.ap-south-1.amazonaws.com/uploads/pod-brand-images/`,
+            base_url   : `${process.env.DIR_UPLOADS}pod-brand-images/`,
         });
     } catch (error) {
         console.error('Error fetching device brand list:', error);

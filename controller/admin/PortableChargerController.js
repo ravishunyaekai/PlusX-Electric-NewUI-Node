@@ -466,7 +466,7 @@ export const slotList = async (req, resp) => {
         const params = {
             tableName  : 'portable_charger_slot',
             columns    : `slot_id, slot_date, start_time, end_time, booking_limit, status, 
-                (SELECT COUNT(id) FROM portable_charger_booking AS pod WHERE pod.slot_time = portable_charger_slot.start_time AND pod.slot_date = portable_charger_slot.slot_date AND status NOT IN ("PU", "C", "RO")) AS slot_booking_count
+                (SELECT COUNT(id) FROM portable_charger_booking AS pod WHERE pod.slot_time = portable_charger_slot.start_time AND pod.slot_date = portable_charger_slot.slot_date AND status NOT IN ("C")) AS slot_booking_count
             `,
             sortColumn : 'slot_date DESC, start_time ASC',
             sortOrder  : '',
@@ -717,13 +717,12 @@ export const assignBooking = async (req, resp) => {
        
         const href    = 'portable_charger_booking/' + booking_id;
         const heading = 'Booking Assigned!';
-        const desc    = `Your POD Booking has been assigned to Driver by PlusX admin with booking id : ${booking_id}`;
+        const desc    = `Booking Assigned : ${booking_id}`; //`Your POD Booking has been assigned to Driver by PlusX admin with booking id : ${booking_id}`;
         // createNotification(heading, desc, 'Portable Charging Booking', 'Rider', 'Admin', '', booking_data.rider_id, href);
-    //    
-        // pushNotification(booking_data.fcm_token, heading, desc, 'RDRFCM', href);
+        // /pushNotification(booking_data.fcm_token, heading, desc, 'RDRFCM', href);
 
         const heading1 = 'Portable Charging Booking!';
-        const desc1    = `Booking Assigned: (${booking_id})`;
+        const desc1    = `Booking Assigned : ${booking_id}`;
         createNotification(heading, desc1, 'Portable Charger', 'RSA', 'Rider', booking_data.rider_id, rsa_id, href);
         pushNotification(rsa.fcm_token, heading1, desc1, 'RSAFCM', href);
 
@@ -732,8 +731,8 @@ export const assignBooking = async (req, resp) => {
                 <h4>Dear ${rsa.rsa_name},</h4>
                 <p>A Booking of the portable charging booking has been assigned to you.</p> 
                 <p>Booking Details:</p>
-                Booking ID: ${booking_id}<br>
-                Date and Time of Service: ${slotDateTime}<br>        
+                <p>Booking ID: ${booking_id}</p>
+                <p>Date and Time of Service: ${moment(slotDateTime, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</p>
                 <p> Best regards,<br/>PlusX Electric Team </p>
             </body>
         </html>`;
@@ -870,7 +869,7 @@ export const adminCancelPCBooking = asyncHandler(async (req, resp) => {
             <p>We would like to inform you that your recent booking for the Portable EV Charger Service with PlusX Electric has been cancelled.</p><br />
             <p>Booking Details:</p><br />
             <p>Booking ID    : ${booking_id}</p>
-            <p>Date and Time : ${checkOrder.slot_date} - ${checkOrder.slot_time}</p>
+            <p>Date and Time : ${moment(`${checkOrder.slot_date} ${checkOrder.slot_time}`, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')} </p>
             <p>Location      : ${checkOrder.address}</p> <br />
             <p>If you have any questions or wish to reschedule your booking, please don't hesitate to reach out to us through the PlusX Electric app or by contacting our support team.</p>
             <p>Thank you for choosing PlusX Electric. We look forward to serving you again in the future.</p><br />
@@ -887,7 +886,7 @@ export const adminCancelPCBooking = asyncHandler(async (req, resp) => {
             <p>User Name    : ${checkOrder.user_name}</p>
             <p>User Contact    : ${checkOrder.contact_no}</p>
             <p>Booking ID    : ${booking_id}</p>
-            <p>Scheduled Date and Time : ${checkOrder.slot_date} - ${checkOrder.slot_time}</p> 
+            <p>Scheduled Date and Time : ${moment(`${checkOrder.slot_date} ${checkOrder.slot_time}`, 'YYYY-MM-DD HH:mm:ss').format('D MMM, YYYY, h:mm A')}</p> 
             <p>Location      : ${checkOrder.address}</p> <br />
             <p>Thank you for your attention to this update.</p><br />
             <p>Best regards,<br/> The PlusX Electric Team </p>
