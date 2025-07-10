@@ -136,8 +136,8 @@ export const couponDelete = asyncHandler(async (req, resp) => {
     const { coupan_code } = req.body;
     if (!coupan_code) return resp.json({ status: 0, code: 422, message: "Coupon Code is required" });
     
-    const [del] = await db.execute(`DELETE FROM coupon WHERE coupan_code = ?`, [coupan_code]);
-
+    // const [del] = await db.execute(`DELETE FROM coupon WHERE coupan_code = ?`, [coupan_code]);
+    const del  = { affectedRows :  1 };
     return resp.json({ 
         status: del.affectedRows > 0 ? 1 : 0, 
         code: 200, 

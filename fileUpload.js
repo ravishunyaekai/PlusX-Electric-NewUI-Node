@@ -58,11 +58,11 @@ export const handleFileUploadOld = (dirName, fileFields, requiredFields = [], ma
                 } else {
                     errorMsg[err.field || 'unknown'] = err.message || 'An unknown error occurred.';
                 }
-                return res.status(422).json({ status: 0, code: 422, message: errorMsg });
+                return res.json({ status: 0, code: 422, message: errorMsg });
             }
 
             if (Object.keys(errorMsg).length > 0) {
-                return res.status(422).json({ status: 0, code: 422, message: errorMsg });
+                return res.json({ status: 0, code: 422, message: errorMsg });
             }
 
             req.uploadedFiles = req.files || [];
@@ -133,7 +133,7 @@ export const handleFileUploadOld = (dirName, fileFields, requiredFields = [], ma
                     } else {
                         errorMsg[err.field || 'unknown'] = err.message || 'Unknown error';
                     }
-                  return res.status(422).json({ status: 0, code: 422, message: errorMsg });
+                  return res.json({ status: 0, code: 422, message: errorMsg });
                 }
                 if (!req.files || Object.keys(req.files).length === 0) {
                     return next();
@@ -155,7 +155,7 @@ export const handleFileUploadOld = (dirName, fileFields, requiredFields = [], ma
          
                 } catch (uploadErr) {
                     console.error(' S3 Upload Error:', uploadErr);
-                    return res.status(500).json({ status: 0, message: 'Failed to upload to S3.' });
+                    return res.json({ status: 0, message: 'Failed to upload to S3.' });
                 }
             });
         };

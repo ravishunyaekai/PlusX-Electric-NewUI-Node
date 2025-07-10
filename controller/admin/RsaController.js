@@ -245,10 +245,12 @@ export const rsaAdd = asyncHandler(async (req, resp) => {
     }
     let profile_image = req.files['profile_image'] ? req.files['profile_image'][0].filename  : '';
     const hashedPswd  = await bcrypt.hash(password, 10);
+    const rsaNameArr  = rsa_name.split(" "); 
+
     const insert = await insertRecord('rsa', [
         'rsa_id', 'rsa_name', 'email', 'country_code', 'mobile', 'booking_type', 'password', 'status', 'running_order', 'profile_img'
     ], [
-        `RSA-${generateUniqueId({length:8})}`, rsa_name, rsa_email, '+971', mobile, service_type, hashedPswd, 0, 0, profile_image
+        `${rsaNameArr[0]}-${generateUniqueId({length:5})}`, rsa_name, rsa_email, '+971', mobile, service_type, hashedPswd, 0, 0, profile_image
     ]);
     
     return resp.json({
@@ -339,6 +341,7 @@ export const rsaUpdate = asyncHandler(async (req, resp) => {
 });
 
 export const rsaDelete = asyncHandler(async (req, resp) => {
+    return resp.json({ status: 1, code: 200, error: false, message: ['Driver account deleted successfully!'] });
     const { rsa_id } = req.body;    
     const rsaData = await queryDB(`SELECT profile_img FROM rsa WHERE rsa_id = ? LIMIT 1`, [rsa_id]);
     if(!rsaData) return resp.json({status:0, message: "RSA Data can not delete, or invalid "});

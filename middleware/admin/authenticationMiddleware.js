@@ -33,23 +33,22 @@ export const authenticateAdmin = async (req, resp, next) => {
     // console.log('body', req.body)
 
     if (!token) {
-        return resp.status(401).json({ message: 'Access token is missing' });
+        return resp.json({ status : 401, message: 'Access token is missing' });
     }
     if (token !== process.env.CUSTOM_TOKEN) {
-        return resp.status(403).json({ message: "Unauthorized access" });
+        return resp.status(403).json({ status : 403, message: "Unauthorized access" });
     }
-
     try {
         const [rows] = await db.execute("SELECT * FROM users WHERE id = ? AND email = ? AND status = 1", [userId, email]);
 
         if (rows.length === 0) {
-            return resp.status(403).json({ message: "Unauthorized access or invalid user status" });
+            return resp.json({ status : 403, message: "Unauthorized access or invalid user status" });
         }
         next();
 
     } catch (error) {
         console.error('Error in authentication:', error);
-        return resp.status(500).json({ message: "Internal server error" });
+        return resp.json({ status : 500, message: "Internal server error" });
     }
 };
 

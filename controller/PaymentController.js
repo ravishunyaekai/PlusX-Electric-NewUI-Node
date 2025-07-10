@@ -218,7 +218,7 @@ export const removeCard = async (req, resp) => {
     // console.log('ravvi',  mergeParam(req))  
     const stripe                = new Stripe(process.env.STRIPE_SECRET_KEY);
     const { payment_method_id } = mergeParam(req);
-    if (!payment_method_id) return resp.status(400).json({ status: 0, code: 422, message: ['Payment Method ID is required.']});
+    if (!payment_method_id) return resp.json({ status: 0, code: 422, message: ['Payment Method ID is required.']});
     
     try {
         const detachedPaymentMethod = await stripe.paymentMethods.detach(payment_method_id);
@@ -595,7 +595,7 @@ export const getPaymentSession = async (req, resp) => {
     
     const { rider_id, rider_name, rider_email, amount, currency, booking_id, building_name, street_name='', unit_no, area, emirate, booking_type, coupon_code='' } = mergeParam(req);
 
-    const { isValid, errors } = validateFields(req.body, {
+    const { isValid, errors } = validateFields(mergeParam(req), {
         rider_id      : ["required"],
         rider_name    : ["required"],
         rider_email   : ["required"],

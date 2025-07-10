@@ -30,7 +30,7 @@ export const sellVehicleList = asyncHandler(async (req, resp) => {
         total_page: result.totalPage,
         status: 1,
         code: 200,
-        image_path: `${process.env.DIR_UPLOADS}/vehicle-image/`
+        image_path: `${process.env.DIR_UPLOADS}vehicle-image/`
     });
 });
 
@@ -60,6 +60,6 @@ export const sellVehicleDetail = asyncHandler(async (req, resp) => {
         code: 200,
         message: ["Car Sell detail fetched successfully!"],
         data: data,
-        base_url: `${process.env.DIR_UPLOADS}/vehicle-images/`,
+        base_url: `${process.env.DIR_UPLOADS}vehicle-images/`,
     });
 });

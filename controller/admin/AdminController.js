@@ -329,25 +329,7 @@ export const deleteRider = async (req, resp) => {
         if (rider.length === 0) return resp.json({ status: 0, message: 'Rider not found.' });
 
         const deleteQueries = [
-            // 'DELETE FROM notifications                         WHERE receive_id = ?',
-            // 'DELETE FROM road_assistance                       WHERE rider_id   = ?',
-            // 'DELETE FROM order_assign                          WHERE rider_id   = ?',
-            // 'DELETE FROM order_history                         WHERE rider_id   = ?',
-            // 'DELETE FROM charging_installation_service         WHERE rider_id   = ?',
-            // 'DELETE FROM charging_installation_service_history WHERE rider_id   = ?',
-            // 'DELETE FROM charging_service                      WHERE rider_id   = ?',
-            // 'DELETE FROM charging_service_history              WHERE rider_id   = ?',
-            // 'DELETE FROM portable_charger_booking              WHERE rider_id   = ?',
-            // 'DELETE FROM portable_charger_history              WHERE rider_id   = ?',
-            // 'DELETE FROM discussion_board                      WHERE rider_id   = ?',
-            // 'DELETE FROM board_comment                         WHERE rider_id   = ?',
-            // 'DELETE FROM board_comment_reply                   WHERE rider_id   = ?',
-            // 'DELETE FROM board_likes                           WHERE rider_id   = ?',
-            // 'DELETE FROM board_poll                            WHERE rider_id   = ?',
-            // 'DELETE FROM board_poll_vote                       WHERE rider_id   = ?',
-            // 'DELETE FROM board_share                           WHERE sender_id  = ?',
-            // 'DELETE FROM board_views                           WHERE rider_id   = ?',
-            'DELETE FROM riders                                WHERE rider_id   = ?'
+            'DELETE FROM riders WHERE rider_id = ?'
         ];
         // Execute each delete query
         for (const query of deleteQueries) {
