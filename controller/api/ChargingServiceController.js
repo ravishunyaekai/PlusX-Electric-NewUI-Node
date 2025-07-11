@@ -12,6 +12,8 @@ dotenv.config();
 
 import { tryCatchErrorHandler } from "../../middleware/errorHandler.js";
 import { io } from '../../server.js';
+import { valetChargerInvoice } from '../driver/ChargingServiceController.js';
+
 // const __filename = fileURLToPath(import.meta.url);
 // const __dirname = path.dirname(__filename);
 
@@ -382,7 +384,7 @@ export const cancelValetBooking = asyncHandler(async (req, resp) => {
     if(insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
 
     await updateRecord('charging_service', {order_status: 'C'}, ['request_id'], [booking_id]);
-    
+    await valetChargerInvoice(rider_id, booking_id);
     const href    = `charging_service/${booking_id}`;
     const title   = 'EV Pick Up & Drop Off Booking!';
     const message = `Booking Cancelled : ${booking_id}`;

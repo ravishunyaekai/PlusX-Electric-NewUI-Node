@@ -596,7 +596,7 @@ const getPodBatteryData = async (pod_id) => {
 }
 
 // ye new bana hai 
-const portableChargerInvoice = async (rider_id, request_id ) => {
+export const portableChargerInvoice = async (rider_id, request_id ) => {
     try {
         const checkOrder = await queryDB(` SELECT payment_intent_id
             FROM 

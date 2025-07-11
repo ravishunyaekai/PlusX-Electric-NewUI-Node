@@ -11,6 +11,8 @@ dotenv.config();
 import { tryCatchErrorHandler } from "../../middleware/errorHandler.js";
 import { io } from '../../server.js';
 
+import { portableChargerInvoice } from '../driver/PortableChargerController.js';
+
 export const chargerList = asyncHandler(async (req, resp) => {
     const {rider_id, page_no } = mergeParam(req);
     const { isValid, errors } = validateFields(mergeParam(req), {rider_id: ["required"], page_no: ["required"]});
@@ -55,7 +57,7 @@ export const getPcSlotList = asyncHandler(async (req, resp) => {
     query += ` FROM portable_charger_slot WHERE status = ? AND slot_date = ? ORDER BY start_time ASC`;
     const [slot] = await db.execute(query, [1, fSlotDate]);
     
-    if(moment(fSlotDate).day() === 0) { 
+    if(moment(fSlotDate).day() === 0 ) { 
         slot.forEach((val) => {
             val.booking_limit      = 0;
             val.slot_booking_count = 0;
@@ -469,7 +471,7 @@ export const userCancelPCBooking = asyncHandler(async (req, resp) => {
     if (insert.affectedRows == 0) return resp.json({ message: ['Oops! Something went wrong! Please Try Again'], status: 0, code: 200 });
  
     await updateRecord('portable_charger_booking', { status : 'C' }, ['booking_id'], [booking_id]);
- 
+    await portableChargerInvoice(rider_id, booking_id); 
     const href    = `portable_charger_booking/${booking_id}`;
     const title   = 'Portable Charging Booking!';
     const message = `Booking Cancelled : ${booking_id}`;

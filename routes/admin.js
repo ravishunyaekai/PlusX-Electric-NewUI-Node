@@ -41,13 +41,10 @@ import { truckList, truckDetails, addtruck, editTruck, deleteTruck, truckFuelHhi
 
 const router = Router();
 
-// router.get('/pod-booking-list-download', donwloadPodBookingList);
-// router.get('/user-signup-list-download', donwloadUserList);
-
 const adminAuthRoutes = [
     { method: 'post', path: '/login', handler: login },
-    { method: 'get',  path: '/pod-booking-list-download', handler: donwloadPodBookingList },
-    { method: 'get',  path: '/user-signup-list-download', handler: donwloadUserList },
+    // { method: 'get',  path: '/pod-booking-list-download', handler: donwloadPodBookingList },
+    // { method: 'get',  path: '/user-signup-list-download', handler: donwloadUserList },
 ]
 adminAuthRoutes.forEach(({ method, path, handler }) => {
     router[method](path, adminAuthorization, handler);
@@ -61,10 +58,10 @@ const adminRoutes = [
     { method: 'post', path: '/notification-list',     handler: notificationList },
     { method: 'post', path: '/rider-list',            handler: riderList },
     { method: 'post', path: '/rider-details',         handler: riderDetails },
-    { method: 'post', path: '/delete-rider',          handler: deleteRider },
+    // { method: 'post', path: '/delete-rider',          handler: deleteRider },
     { method: 'post', path: '/location-list',         handler: locationList },
     { method: 'post',  path: '/location-area-list',   handler: areaList },
-    { method: 'post', path: '/deleted-rider-list',    handler: deletedRiderList },
+    // { method: 'post', path: '/deleted-rider-list',    handler: deletedRiderList },
     { method: 'post',  path: '/all-area-list',        handler: bookingAreaList },
 
     /* Portable Charger */ 
@@ -72,7 +69,7 @@ const adminRoutes = [
     { method: 'post',   path: '/charger-details',                 handler: chargerDetails },
     { method: 'post',   path: '/add-charger',                     handler: addCharger },
     { method: 'post',   path: '/edit-charger',                    handler: editCharger },
-    { method: 'post',   path: '/delete-charger',                  handler: deleteCharger },
+    // { method: 'post',   path: '/delete-charger',                  handler: deleteCharger },
     { method: 'post',   path: '/charger-booking-list',            handler: chargerBookingList },
     { method: 'post',   path: '/charger-booking-details',         handler: chargerBookingDetails },
     { method: 'post',   path: '/charger-booking-invoice-list',    handler: invoiceList },
@@ -82,7 +79,7 @@ const adminRoutes = [
     { method: 'post',   path: '/charger-slot-details',            handler: slotDetails },
     { method: 'post',   path: '/charger-add-time-slot',           handler: addSlot },
     { method: 'post',   path: '/charger-edit-time-slot',          handler: editSlot },
-    { method: 'post',   path: '/charger-delete-time-slot',        handler: deleteSlot },
+    // { method: 'post',   path: '/charger-delete-time-slot',        handler: deleteSlot },
     { method: 'post',   path: '/customer-charger-booking-list',   handler: customerChargerBookingList },
     { method: 'post',   path: '/failed-charger-booking-list',     handler: failedChargerBookingList },
     { method: 'post',   path: '/failed-charger-booking-details',  handler: failedchargerBookingDetails },
@@ -96,7 +93,7 @@ const adminRoutes = [
     { method: 'post',   path: '/pick-and-drop-slot-details',     handler: pdSlotDetails },
     { method: 'post',   path: '/pick-and-drop-add-slot',         handler: pdAddSlot },
     { method: 'post',   path: '/pick-and-drop-edit-slot',        handler: pdEditSlot },
-    { method: 'post',   path: '/pick-and-drop-delete-slot',      handler: pdDeleteSlot },
+    // { method: 'post',   path: '/pick-and-drop-delete-slot',      handler: pdDeleteSlot },
     { method: 'post',   path: '/failed-pick-and-drop-booking-list', handler: failedBookingList },
     { method: 'post',   path: '/failed-pick-and-drop-booking-details', handler: failedbookingDetails },
 
@@ -106,7 +103,7 @@ const adminRoutes = [
     { method: 'post',   path: '/public-charger-station-data',    handler: stationData },
     { method: 'post',   path: '/public-charger-add-station',     handler: addPublicCharger },
     { method: 'post',   path: '/public-charger-edit-station',    handler: editPublicCharger },
-    { method: 'post',   path: '/public-chargers-delete',         handler: deletePublicCharger },
+    // { method: 'post',   path: '/public-chargers-delete',         handler: deletePublicCharger },
     { method: 'post',   path: '/chargers-gallery-del',           handler: deletePublicChargerGallery },
 
     /* Charger Installation */
@@ -119,16 +116,16 @@ const adminRoutes = [
     { method: 'post',   path: '/shop-add',            handler: storeAdd },
     { method: 'post',   path: '/shop-view',           handler: storeView },
     { method: 'post',   path: '/shop-update',         handler: storeUpdate },
-    { method: 'post',   path: '/shop-delete',         handler: storeDelete },
-    { method: 'post',   path: '/shop-gallery-delete', handler: deleteStoreGallery },
+    // { method: 'post',   path: '/shop-delete',         handler: storeDelete },
+    // { method: 'post',   path: '/shop-gallery-delete', handler: deleteStoreGallery },
     { method: 'post',   path: '/shop-service-list',   handler: serviceList },
     { method: 'post',   path: '/shop-service-create', handler: serviceCreate },
     { method: 'post',   path: '/shop-service-update', handler: serviceUpdate },
-    { method: 'post',   path: '/shop-service-delete', handler: serviceDelete },
+    // { method: 'post',   path: '/shop-service-delete', handler: serviceDelete },
     { method: 'post',   path: '/shop-brand-list',     handler: brandList },
     { method: 'post',   path: '/shop-brand-create',   handler: brandCreate },
     { method: 'post',   path: '/shop-brand-update',   handler: brandUpdate },
-    { method: 'post',   path: '/shop-brand-delete',   handler: brandDelete },
+    // { method: 'post',   path: '/shop-brand-delete',   handler: brandDelete },
 
     /* RSA Routes */
     { method: 'post',  path: '/rsa-list',          handler: rsaList },
@@ -136,7 +133,7 @@ const adminRoutes = [
     
     { method: 'post',  path: '/rsa-add',           handler: rsaAdd },
     { method: 'post',  path: '/rsa-update',        handler: rsaUpdate },
-    { method: 'post',  path: '/rsa-delete',        handler: rsaDelete },
+    // { method: 'post',  path: '/rsa-delete',        handler: rsaDelete },
     { method: 'post',  path: '/rsa-status-change', handler: rsaStatusChange },
     { method: 'post',  path: '/rsa-booking-list',  handler: driverBookingList },
     { method: 'post',  path: '/all-rsa-list',      handler: allRsaList },
@@ -147,24 +144,24 @@ const adminRoutes = [
     { method: 'post',  path: '/club-data',       handler: clubData },
     { method: 'post',  path: '/add-club',        handler: clubCreate },
     { method: 'post',  path: '/edit-club',       handler: clubUpdate },
-    { method: 'post',  path: '/club-delete',     handler: clubDelete },
-    { method: 'post',  path: '/club-delete-img', handler: clubDeleteImg },
+    //{ method: 'post',  path: '/club-delete',     handler: clubDelete },
+    //{ method: 'post',  path: '/club-delete-img', handler: clubDeleteImg },
 
     /* Electric Cars Leasing */
     { method: 'post',    path: '/electric-cars-list',     handler: carsList },
     { method: 'post',    path: '/electric-car-detail',    handler: carDetail },
     { method: 'post',    path: '/electric-car-add',       handler: carAdd },
     { method: 'post',    path: '/electric-car-edit',      handler: carEdit },
-    { method: 'post',    path: '/electric-car-delete',    handler: carDelete },
-    { method: 'post',    path: '/electric-car-gallery-delete', handler: carGalleryDelete },
+    //{ method: 'post',    path: '/electric-car-delete',    handler: carDelete },
+    //{ method: 'post',    path: '/electric-car-gallery-delete', handler: carGalleryDelete },
 
     /* Electric Bikes Leasing */
     { method: 'post',  path: '/electric-bikes-list',     handler: bikesList },
     { method: 'post',  path: '/electric-bike-detail',    handler: bikeDetail },
     { method: 'post',  path: '/electric-bike-add',       handler: bikeAdd },
     { method: 'post',  path: '/electric-bike-edit',      handler: bikeEdit },
-    { method: 'post',  path: '/electric-bike-delete',    handler: bikeDelete },
-    { method: 'post',  path: '/electric-bike-gallery-delete', handler: bikeGalleryDelete },
+    //{ method: 'post',  path: '/electric-bike-delete',    handler: bikeDelete },
+    //{ method: 'post',  path: '/electric-bike-gallery-delete', handler: bikeGalleryDelete },
 
     /* EV Road Assistance assignBooking*/
     { method: 'post', path: '/ev-road-assistance-booking-list',    handler: evRoadAssistanceBooking },
@@ -186,14 +183,14 @@ const adminRoutes = [
     { method: 'post',   path: '/coupon-data',     handler: couponDetail },
     { method: 'post',   path: '/add-coupan',      handler: couponAdd },
     { method: 'post',   path: '/edit-coupan',     handler: couponEdit },
-    { method: 'post',   path: '/delete-coupan',   handler: couponDelete },
+    //{ method: 'post',   path: '/delete-coupan',   handler: couponDelete },
 
     /* Offer */
     { method: 'post',   path: '/offer-list',   handler: offerList },
     { method: 'post',   path: '/offer-detail', handler: offerDetail },
     { method: 'post',   path: '/add-offer',    handler: offerAdd },
     { method: 'post',   path: '/edit-offer',   handler: offerEdit },
-    { method: 'post',   path: '/delete-offer', handler: offerDelete },
+    //{ method: 'post',   path: '/delete-offer', handler: offerDelete },
     { method: 'post',   path: '/offer-click-history', handler: offerClickhistory },
 
     /* Subscription */  
@@ -203,15 +200,15 @@ const adminRoutes = [
     /* Discussion Board */
     { method: 'post',   path: '/discussion-board-list',   handler: discussionBoardList },
     { method: 'post',   path: '/discussion-board-detail', handler: discussionBoardDetail },
-    { method: 'post',   path: '/discussion-board-delete', handler: discussionBoardDelete },
+    //{ method: 'post',   path: '/discussion-board-delete', handler: discussionBoardDelete },
 
     /* Ev Guide Routes */
     { method: 'post',  path: '/ev-guide-list',            handler: guideList },
     { method: 'post',  path: '/ev-guide-add',             handler: addGuide },
     { method: 'post',  path: '/ev-guide-details',         handler: guideDetail },
     { method: 'post',  path: '/ev-guide-update',          handler: editGuide },
-    { method: 'post',  path: '/ev-guide-delete',          handler: deleteGuide },
-    { method: 'post',  path: '/ev-guide-gallery-delete',  handler: deleteEvGuideGallery },
+    //{ method: 'post',  path: '/ev-guide-delete',          handler: deleteGuide },
+    //{ method: 'post',  path: '/ev-guide-gallery-delete',  handler: deleteEvGuideGallery },
 
     /* EV Buy & Sell */
     { method: 'post',  path: '/buy-sell-list',    handler: sellVehicleList },
@@ -228,7 +225,7 @@ const adminRoutes = [
     { method: 'post',  path: '/ev-pre-sale-time-slot-details',     handler: evPreSaleTimeSlotDetails },
     { method: 'post',  path: '/ev-pre-sale-add-time-slot-list',    handler: evPreSaleTimeSlotAdd },
     { method: 'post',  path: '/ev-pre-sale-edit-time-slot-list',   handler: evPreSaleTimeSlotEdit },
-    { method: 'post',  path: '/ev-pre-sale-delete-time-slot-list', handler: evPreSaleTimeSlotDelete },
+    //{ method: 'post',  path: '/ev-pre-sale-delete-time-slot-list', handler: evPreSaleTimeSlotDelete },
 
     /* Admin Booking Cancel */
     { method: 'post', path: '/portable-charger-cancel',  handler: adminCancelPCBooking },
@@ -239,7 +236,7 @@ const adminRoutes = [
     { method: 'post',  path: '/pod-device-add',             handler: addPodDevice },
     { method: 'post',  path: '/pod-device-details',         handler: podDeviceDetails },
     { method: 'post',  path: '/pod-device-update',          handler: editPodDevice },
-    { method: 'post',  path: '/pod-device-delete',          handler: deletePodDevice },
+    //{ method: 'post',  path: '/pod-device-delete',          handler: deletePodDevice },
     { method: 'post',  path: '/pod-device-status-change',   handler: podDeviceStatusChange },
 
     /* POD Device Brand Routes */
@@ -248,7 +245,7 @@ const adminRoutes = [
     { method: 'post',  path: '/add-pod-brand',              handler: addPodBrand },
     { method: 'post',  path: '/pod-brand-details',          handler: podDeviceDetails },
     { method: 'post',  path: '/edit-pod-brand',             handler: editPodDevice },
-    { method: 'post',  path: '/pod-brand-delete',           handler: deletePodDevice },
+    //{ method: 'post',  path: '/pod-brand-delete',           handler: deletePodDevice },
     { method: 'post',  path: '/device-brand-list',          handler: deviceBrandList },
 
     /* POD Area Routes */
@@ -268,7 +265,7 @@ const adminRoutes = [
     { method: 'post',  path: '/truck-add',           handler: addtruck },
     { method: 'post',  path: '/truck-details',       handler: truckDetails },
     { method: 'post',  path: '/truck-update',        handler: editTruck },
-    { method: 'post',  path: '/truck-delete',        handler: deleteTruck },
+    //{ method: 'post',  path: '/truck-delete',        handler: deleteTruck },
     { method: 'post',  path: '/truck-fuel-history',  handler: truckFuelHhistory },
 ]; 
 

@@ -484,7 +484,7 @@ const workComplete = async (req, resp) => {
 };
 
 // ye new bana hai 
-const valetChargerInvoice = async (rider_id, request_id ) => {
+export const valetChargerInvoice = async (rider_id, request_id ) => {
     // console.log(rider_id, request_id)
     try {
         const checkOrder = await queryDB(` SELECT payment_intent_id

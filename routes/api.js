@@ -98,19 +98,19 @@ const authzAndAuthRoutes = [
     { method: 'get',  path: '/rider-home',                 handler: home },
     { method: 'get',  path: '/get-rider-data',             handler: getRiderData },
     { method: 'post', path: '/rider-profile-change',       handler: updateProfile },
-    { method: 'get',  path: '/rider-profile-image-delete', handler: deleteImg },
-    { method: 'get',  path: '/rider-account-delete',       handler: deleteAccount },
+    { method: 'get',  path: '/rider-profile-image-delete', handler: deleteImg },  //
+    { method: 'get',  path: '/rider-account-delete',       handler: deleteAccount },  // 
     { method: 'post', path: '/rider-logout',               handler: logout },
     { method: 'post', path: '/rider-change_password',      handler: updatePassword },
     { method: 'get',  path: '/rider-notification-list',    handler: notificationList },
     { method: 'post', path: '/rider-address-add',          handler: addRiderAddress },
     { method: 'get',  path: '/rider-address-list',         handler: riderAddressList },
-    { method: 'post', path: '/rider-address-edit',          handler: editRiderAddress },
-    { method: 'get',  path: '/rider-address-delete',       handler: deleteRiderAddress },
+    { method: 'post', path: '/rider-address-edit',          handler: editRiderAddress },   //
+    { method: 'get',  path: '/rider-address-delete',       handler: deleteRiderAddress },  //
     { method: 'post', path: '/rider-vehicle-add',          handler: addRiderVehicle },
-    { method: 'post', path: '/rider-vehicle-edit',         handler: editRiderVehicle },
+    { method: 'post', path: '/rider-vehicle-edit',         handler: editRiderVehicle },   //
     { method: 'get',  path: '/rider-vehicle-list',         handler: riderVehicleList },
-    { method: 'get',  path: '/rider-vehicle-delete',       handler: deleteRiderVehicle },
+    { method: 'get',  path: '/rider-vehicle-delete',       handler: deleteRiderVehicle },  //
     { method: 'post', path: '/rider-address-default',      handler: defaultAddress },
     { method: 'post', path: '/rider-vehicle-default',      handler: defaultVehicle },
 
@@ -152,9 +152,9 @@ const authzAndAuthRoutes = [
     { method: 'get',  path: '/all-sell-vehicle-list', handler: allSellVehicleList },
     { method: 'get',  path: '/sell-vehicle-list',     handler: sellVehicleList },
     { method: 'get',  path: '/sell-vehicle-details',  handler: sellVehicleDetail },
-    { method: 'post', path: '/edit-sell-vehicle',     handler: updateSellVehicle },
-    { method: 'post', path: '/edit-sell-vehicle-img', handler: updateSellVehicleImg },
-    { method: 'get',  path: '/delete-sell-vehicle',   handler: deleteSellVehicle },
+    { method: 'post', path: '/edit-sell-vehicle',     handler: updateSellVehicle },     //
+    { method: 'post', path: '/edit-sell-vehicle-img', handler: updateSellVehicleImg },  //
+    { method: 'get',  path: '/delete-sell-vehicle',   handler: deleteSellVehicle },     //
     { method: 'get',  path: '/sold-sell-vehicle',     handler: soldSellVehicle },
 
     /* Discussion Board */
@@ -169,11 +169,11 @@ const authzAndAuthRoutes = [
     { method: 'get',  path: '/board-vote-poll',                  handler: votePoll },
     { method: 'get',  path: '/discussion-board-report',          handler: reportOnBoard },
     { method: 'get',  path: '/discussion-board-not-interested',  handler: boardNotInterested },
-    { method: 'get',  path: '/discussion-board-delete',          handler: boardDelete },
-    { method: 'post', path: '/discussion-board-edit',            handler: editBoard },
-    { method: 'post', path: '/board-vote-edit',                  handler: editPoll },
-    { method: 'post', path: '/delete-comment',                   handler: deleteComment },
-    { method: 'post', path: '/delete-reply-comment',             handler: deleteReplyComment },
+    { method: 'get',  path: '/discussion-board-delete',          handler: boardDelete },  ////////
+    { method: 'post', path: '/discussion-board-edit',            handler: editBoard },   //////
+    { method: 'post', path: '/board-vote-edit',                  handler: editPoll },     //////
+    { method: 'post', path: '/delete-comment',                   handler: deleteComment },   /////// 
+    { method: 'post', path: '/delete-reply-comment',             handler: deleteReplyComment },  //////
     { method: 'get',  path: '/comment-like',                     handler: commentLike },
     { method: 'get',  path: '/reply-comment-like',               handler: replyCommentLike },
 
@@ -186,7 +186,7 @@ const authzAndAuthRoutes = [
     { method: 'get',  path: '/pick-and-drop-invoice-detail', handler: getInvoiceDetail },
     { method: 'post', path: '/charging-service-cancel',      handler: cancelValetBooking },
     { method: 'post', path: '/feedback-charging-service',    handler: userFeedbackValetBooking },
-    { method: 'post', path: '/reschedule-charging-service', handler: rescheduleService },
+    { method: 'post', path: '/reschedule-charging-service',  handler: rescheduleService },   ///
 
     /* Portable charger */
     { method: 'get',  path: '/portable-charger-list',            handler: chargerList },
@@ -196,7 +196,7 @@ const authzAndAuthRoutes = [
     { method: 'get',  path: '/portable-charger-slot-list',       handler: getPcSlotList },
     { method: 'get',  path: '/portable-charger-subscription',    handler: getPcSubscriptionList },
     { method: 'get',  path: '/portable-charger-cancel',          handler: userCancelPCBooking }, 
-    { method: 'post', path: '/reschedule-portable-charger-booking', handler: reScheduleBooking },
+    { method: 'post', path: '/reschedule-portable-charger-booking', handler: reScheduleBooking },   ///
     { method: 'post', path: '/feedback-portable-charger-booking', handler: userFeedbackPCBooking },
 
     /* Offer Routes */
